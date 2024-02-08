@@ -91,14 +91,14 @@ function mountComponent(
 
   // hook: beforeMount
   bm && invokeArrayFns(bm)
-  invokeDirectiveHook(instance, 'beforeMount')
+  invokeDirectiveHook(instance, 'beforeMount', instance.dirs)
 
   insert(block, instance.container)
   instance.isMounted = true
 
   // hook: mounted
   queuePostRenderEffect(() => {
-    invokeDirectiveHook(instance, 'mounted')
+    invokeDirectiveHook(instance, 'mounted', instance.dirs)
     m && invokeArrayFns(m)
   })
   reset()
@@ -111,7 +111,7 @@ export function unmountComponent(instance: ComponentInternalInstance) {
 
   // hook: beforeUnmount
   bum && invokeArrayFns(bum)
-  invokeDirectiveHook(instance, 'beforeUnmount')
+  invokeDirectiveHook(instance, 'beforeUnmount', instance.dirs)
 
   scope.stop()
   block && remove(block, container)
@@ -119,7 +119,7 @@ export function unmountComponent(instance: ComponentInternalInstance) {
   instance.isUnmounted = true
 
   // hook: unmounted
-  invokeDirectiveHook(instance, 'unmounted')
+  invokeDirectiveHook(instance, 'unmounted', instance.dirs)
   um && invokeArrayFns(um)
   unsetCurrentInstance()
 }

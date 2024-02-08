@@ -1,9 +1,32 @@
-import { type EffectScope, effectScope, isReactive } from '@vue/reactivity'
-import { isArray, isObject, isString } from '@vue/shared'
-import { createComment, createTextNode, insert, remove } from './dom/element'
-import { renderEffect } from './renderWatch'
+import {
+  type BaseWatchErrorCodes,
+  type EffectScope,
+  baseWatch,
+  effectScope,
+  isReactive,
+  traverse,
+} from '@vue/reactivity'
+import { isArray, isObject, isString, remove } from '@vue/shared'
+import {
+  createComment,
+  createTextNode,
+  insert,
+  remove as removeBlock,
+} from './dom/element'
 import { type Block, type Fragment, fragmentKey } from './render'
+import {
+  type DirectiveBinding,
+  type DirectiveBindingsMap,
+  type DirectiveHookName,
+  getDirectivesMap,
+  invokeDirectiveHook,
+  setDirectivesWithScopeMap,
+  withDirectives,
+} from './directives'
+import { queuePostRenderEffect } from './scheduler'
+import { handleError } from './errorHandling'
 import { warn } from './warning'
+import { getCurrentInstance } from './component'
 
 interface ForBlock extends Fragment {
   scope: EffectScope
@@ -14,9 +37,11 @@ interface ForBlock extends Fragment {
   memo: any[] | undefined
 }
 
+type Source = any[] | Record<any, any> | number | Set<any> | Map<any, any>
+
 /*! #__NO_SIDE_EFFECTS__ */
 export const createFor = (
-  src: () => any[] | Record<any, any> | number | Set<any> | Map<any, any>,
+  src: () => Source,
   renderItem: (block: ForBlock) => [Block, () => void],
   getKey?: (item: any, key: any, index?: number) => any,
   getMemo?: (item: any, key: any, index?: number) => any[],
@@ -32,9 +57,246 @@ export const createFor = (
     [fragmentKey]: true,
   }
 
+  const instance = getCurrentInstance()
+  if (!instance) {
+    // FIXME should use error handling
+    console.warn('createFor() should be called in Vue Component')
+  }
+
+  const directivesList: DirectiveBindingsMap[] = []
+
   const update = getMemo ? updateWithMemo : updateWithoutMemo
-  renderEffect(() => {
-    const source = src()
+  let isSourceChanged = false
+
+  baseWatch(
+    () => {
+      isSourceChanged = true
+      return traverse(src(), 1)
+    },
+    null,
+    {
+      onError: (err: unknown, type: BaseWatchErrorCodes) =>
+        handleError(err, instance, type),
+    },
+  )
+
+  const relayDirectiveHook = (name: DirectiveHookName) => {
+    for (const dirs of directivesList) {
+      invokeDirectiveHook(instance, name, dirs)
+    }
+  }
+
+  withDirectives(parentAnchor, [
+    [
+      {
+        deep: 1,
+        created: hook,
+        beforeUpdate: hook,
+
+        beforeMount: () => {
+          if (instance?.isMounted) return
+          relayDirectiveHook('beforeMount')
+          queuePostRenderEffect(() => {
+            relayDirectiveHook('mounted')
+          })
+        },
+        beforeUnmount: () => relayDirectiveHook('beforeUnmount'),
+        unmounted: () => relayDirectiveHook('unmounted'),
+      },
+      src,
+    ],
+  ])
+
+  return ref
+
+  function mount(
+    source: any,
+    idx: number,
+    anchor: Node = parentAnchor,
+  ): ForBlock {
+    const scope = effectScope()
+    const isCurrentlyMounted = instance?.isMounted
+    const directives: DirectiveBindingsMap = new Map()
+
+    setDirectivesWithScopeMap(scope, directives)
+    directivesList.push(directives)
+
+    const [item, key, index] = getItem(source, idx)
+    const block: ForBlock = (newBlocks[idx] = {
+      nodes: null!, // set later
+      update: null!, // set later
+      scope,
+      s: [item, key, index],
+      key: getKey && getKey(item, key, index),
+      memo: getMemo && getMemo(item, key, index),
+      [fragmentKey]: true,
+    })
+    const res = scope.run(() => renderItem(block))!
+    block.nodes = res[0]
+    block.update = res[1]
+
+    if (isCurrentlyMounted) {
+      invokeDirectiveHook(instance, 'beforeMount', directives)
+    }
+
+    if (getMemo) block.update()
+    if (parent) insert(block.nodes, parent, anchor)
+
+    if (isCurrentlyMounted) {
+      queuePostRenderEffect(() => {
+        invokeDirectiveHook(instance, 'mounted', directives)
+      })
+    }
+
+    return block
+  }
+
+  function mountList(source: any, offset = 0) {
+    for (let i = offset; i < getLength(source); i++) {
+      mount(source, i)
+    }
+  }
+
+  function tryPatchIndex(source: any, idx: number) {
+    const block = oldBlocks[idx]
+    const [item, key, index] = getItem(source, idx)
+    if (block.key === getKey!(item, key, index)) {
+      update((newBlocks[idx] = block), item)
+      return true
+    }
+  }
+
+  function updateWithMemo(
+    block: ForBlock,
+    newItem: any,
+    newKey = block.s[1],
+    newIndex = block.s[2],
+  ) {
+    let needsUpdate = newKey !== block.s[1] || newIndex !== block.s[2]
+    if (!needsUpdate) {
+      const oldMemo = block.memo!
+      const newMemo = (block.memo = getMemo!(newItem, newKey, newIndex))
+      for (let i = 0; i < newMemo.length; i++) {
+        if ((needsUpdate = newMemo[i] !== oldMemo[i])) {
+          break
+        }
+      }
+    }
+
+    const directives = getDirectivesMap(block.scope)
+    if (directives) {
+      invokeDirectiveHook(instance, 'beforeUpdate', directives)
+    }
+
+    if (needsUpdate) {
+      block.s = [newItem, newKey, newIndex]
+      block.update()
+    }
+
+    if (directives) {
+      queuePostRenderEffect(() => {
+        invokeDirectiveHook(instance, 'updated', directives)
+      })
+    }
+  }
+
+  function updateWithoutMemo(
+    block: ForBlock,
+    newItem: any,
+    newKey = block.s[1],
+    newIndex = block.s[2],
+  ) {
+    const directives = getDirectivesMap(block.scope)
+    if (directives) {
+      invokeDirectiveHook(instance, 'beforeUpdate', directives)
+    }
+
+    if (
+      newItem !== block.s[0] ||
+      newKey !== block.s[1] ||
+      newIndex !== block.s[2] ||
+      !isReactive(newItem)
+    ) {
+      block.s = [newItem, newKey, newIndex]
+      block.update()
+    }
+
+    if (directives) {
+      queuePostRenderEffect(() => {
+        invokeDirectiveHook(instance, 'updated', directives)
+      })
+    }
+  }
+
+  function unmount({ nodes, scope }: ForBlock) {
+    const directives = getDirectivesMap(scope)
+    if (directives) {
+      remove(directivesList, directives)
+      invokeDirectiveHook(instance, 'beforeUnmount', directives)
+    }
+
+    removeBlock(nodes, parent!)
+
+    if (directives) {
+      queuePostRenderEffect(() => {
+        invokeDirectiveHook(instance, 'unmounted', directives)
+      })
+    }
+
+    scope.stop()
+  }
+
+  function getLength(source: any): number {
+    if (isArray(source) || isString(source)) {
+      return source.length
+    } else if (typeof source === 'number') {
+      if (__DEV__ && !Number.isInteger(source)) {
+        warn(`The v-for range expect an integer value but got ${source}.`)
+      }
+      return source
+    } else if (isObject(source)) {
+      if (source[Symbol.iterator as any]) {
+        return Array.from(source as Iterable<any>).length
+      } else {
+        return Object.keys(source).length
+      }
+    }
+    return 0
+  }
+
+  function getItem(
+    source: any,
+    idx: number,
+  ): [item: any, key: any, index?: number] {
+    if (isArray(source) || isString(source)) {
+      return [source[idx], idx, undefined]
+    } else if (typeof source === 'number') {
+      return [idx + 1, idx, undefined]
+    } else if (isObject(source)) {
+      if (source && source[Symbol.iterator as any]) {
+        source = Array.from(source as Iterable<any>)
+        return [source[idx], idx, undefined]
+      } else {
+        const key = Object.keys(source)[idx]
+        return [source[key], key, idx]
+      }
+    }
+    return null!
+  }
+
+  function hook(_: unknown, binding: DirectiveBinding<unknown, Source>) {
+    if (!isSourceChanged) {
+      for (const dirs of directivesList) {
+        invokeDirectiveHook(instance, 'beforeUpdate', dirs)
+        queuePostRenderEffect(() => {
+          invokeDirectiveHook(instance, 'updated', dirs)
+        })
+      }
+      return
+    }
+    isSourceChanged = false
+
+    const source = binding.value
     const newLength = getLength(source)
     const oldLength = oldBlocks.length
     newBlocks = new Array(newLength)
@@ -212,129 +474,6 @@ export const createFor = (
     }
 
     ref.nodes = [(oldBlocks = newBlocks), parentAnchor]
-  })
-
-  return ref
-
-  function mount(
-    source: any,
-    idx: number,
-    anchor: Node = parentAnchor,
-  ): ForBlock {
-    const scope = effectScope()
-    const [item, key, index] = getItem(source, idx)
-    const block: ForBlock = (newBlocks[idx] = {
-      nodes: null!, // set later
-      update: null!, // set later
-      scope,
-      s: [item, key, index],
-      key: getKey && getKey(item, key, index),
-      memo: getMemo && getMemo(item, key, index),
-      [fragmentKey]: true,
-    })
-    const res = scope.run(() => renderItem(block))!
-    block.nodes = res[0]
-    block.update = res[1]
-    if (getMemo) block.update()
-    if (parent) insert(block.nodes, parent, anchor)
-    return block
-  }
-
-  function mountList(source: any, offset = 0) {
-    for (let i = offset; i < getLength(source); i++) {
-      mount(source, i)
-    }
-  }
-
-  function tryPatchIndex(source: any, idx: number) {
-    const block = oldBlocks[idx]
-    const [item, key, index] = getItem(source, idx)
-    if (block.key === getKey!(item, key, index)) {
-      update((newBlocks[idx] = block), item)
-      return true
-    }
-  }
-
-  function updateWithMemo(
-    block: ForBlock,
-    newItem: any,
-    newKey = block.s[1],
-    newIndex = block.s[2],
-  ) {
-    let needsUpdate = newKey !== block.s[1] || newIndex !== block.s[2]
-    if (!needsUpdate) {
-      const oldMemo = block.memo!
-      const newMemo = (block.memo = getMemo!(newItem, newKey, newIndex))
-      for (let i = 0; i < newMemo.length; i++) {
-        if ((needsUpdate = newMemo[i] !== oldMemo[i])) {
-          break
-        }
-      }
-    }
-    if (needsUpdate) {
-      block.s = [newItem, newKey, newIndex]
-      block.update()
-    }
-  }
-
-  function updateWithoutMemo(
-    block: ForBlock,
-    newItem: any,
-    newKey = block.s[1],
-    newIndex = block.s[2],
-  ) {
-    if (
-      newItem !== block.s[0] ||
-      newKey !== block.s[1] ||
-      newIndex !== block.s[2] ||
-      !isReactive(newItem)
-    ) {
-      block.s = [newItem, newKey, newIndex]
-      block.update()
-    }
-  }
-
-  function unmount({ nodes, scope }: ForBlock) {
-    remove(nodes, parent!)
-    scope.stop()
-  }
-
-  function getLength(source: any): number {
-    if (isArray(source) || isString(source)) {
-      return source.length
-    } else if (typeof source === 'number') {
-      if (__DEV__ && !Number.isInteger(source)) {
-        warn(`The v-for range expect an integer value but got ${source}.`)
-      }
-      return source
-    } else if (isObject(source)) {
-      if (source[Symbol.iterator as any]) {
-        return Array.from(source as Iterable<any>).length
-      } else {
-        return Object.keys(source).length
-      }
-    }
-    return 0
-  }
-
-  function getItem(
-    source: any,
-    idx: number,
-  ): [item: any, key: any, index?: number] {
-    if (isArray(source) || isString(source)) {
-      return [source[idx], idx, undefined]
-    } else if (typeof source === 'number') {
-      return [idx + 1, idx, undefined]
-    } else if (isObject(source)) {
-      if (source && source[Symbol.iterator as any]) {
-        source = Array.from(source as Iterable<any>)
-        return [source[idx], idx, undefined]
-      } else {
-        const key = Object.keys(source)[idx]
-        return [source[key], key, idx]
-      }
-    }
-    return null!
   }
 }
 
