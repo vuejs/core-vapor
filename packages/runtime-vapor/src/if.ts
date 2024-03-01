@@ -10,6 +10,7 @@ import {
   withDirectives,
 } from './directives'
 import { getCurrentInstance } from './component'
+import { warn } from './warning'
 
 type BlockFn = () => Block
 
@@ -34,8 +35,7 @@ export const createIf = (
 
   const instance = getCurrentInstance()
   if (!instance) {
-    // FIXME should use error handling
-    console.warn('createIf() can only be used inside setup()')
+    warn('createIf() can only be used inside setup()')
   }
 
   // TODO: SSR

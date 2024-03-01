@@ -59,8 +59,7 @@ export const createFor = (
 
   const instance = getCurrentInstance()
   if (!instance) {
-    // FIXME should use error handling
-    console.warn('createFor() should be called in Vue Component')
+    warn('createFor() should be called in Vue Component')
   }
 
   const directivesList: DirectiveBindingsMap[] = []
