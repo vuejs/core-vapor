@@ -1,29 +1,14 @@
 import { ErrorCodes, callWithErrorHandling, handleError } from './errorHandling'
 import { type Awaited, NOOP, isArray } from '@vue/shared'
 import { type ComponentInternalInstance, getComponentName } from './component'
-import type { Scheduler } from '@vue/reactivity'
+import {
+  type SchedulerJob as BaseSchedulerJob,
+  EffectFlags,
+  SchedulerJobFlags,
+  type WatchScheduler,
+} from '@vue/reactivity'
 
-export interface SchedulerJob extends Function {
-  id?: number
-  pre?: boolean
-  active?: boolean
-  computed?: boolean
-  /**
-   * Indicates whether the effect is allowed to recursively trigger itself
-   * when managed by the scheduler.
-   *
-   * By default, a job cannot trigger itself because some built-in method calls,
-   * e.g. Array.prototype.push actually performs reads as well (#1740) which
-   * can lead to confusing infinite loops.
-   * The allowed cases are component update functions and watch callbacks.
-   * Component update functions may update child component props, which in turn
-   * trigger flush: "pre" watch callbacks that mutates state that the parent
-   * relies on (#1801). Watch callbacks doesn't track its dependencies so if it
-   * triggers itself again, it's likely intentional and it is the user's
-   * responsibility to perform recursive state mutation that eventually
-   * stabilizes (#1727).
-   */
-  allowRecurse?: boolean
+export interface SchedulerJob extends BaseSchedulerJob {
   /**
    * Attached by renderer.ts when setting up a component's render effect
    * Used to obtain component information when reporting max recursive updates.
@@ -71,7 +56,10 @@ function findInsertionIndex(id: number) {
     const middle = (start + end) >>> 1
     const middleJob = queue[middle]
     const middleJobId = getId(middleJob)
-    if (middleJobId < id || (middleJobId === id && middleJob.pre)) {
+    if (
+      middleJobId < id ||
+      (middleJobId === id && middleJob.flags! & SchedulerJobFlags.PRE)
+    ) {
       start = middle + 1
     } else {
       end = middle
@@ -82,23 +70,21 @@ function findInsertionIndex(id: number) {
 }
 
 export function queueJob(job: SchedulerJob) {
-  // the dedupe search uses the startIndex argument of Array.includes()
-  // by default the search index includes the current job that is being run
-  // so it cannot recursively trigger itself again.
-  // if the job is a watch() callback, the search will start with a +1 index to
-  // allow it recursively trigger itself - it is the user's responsibility to
-  // ensure it doesn't end up in an infinite loop.
-  if (
-    !queue.length ||
-    !queue.includes(
-      job,
-      isFlushing && job.allowRecurse ? flushIndex + 1 : flushIndex,
-    )
-  ) {
+  if (!(job.flags! & SchedulerJobFlags.QUEUED)) {
     if (job.id == null) {
+      queue.push(job)
+    } else if (
+      // fast path when the job id is larger than the tail
+      !(job.flags! & SchedulerJobFlags.PRE) &&
+      job.id >= (queue[queue.length - 1]?.id || 0)
+    ) {
       queue.push(job)
     } else {
       queue.splice(findInsertionIndex(job.id), 0, job)
+    }
+
+    if (!(job.flags! & SchedulerJobFlags.ALLOW_RECURSE)) {
+      job.flags! |= SchedulerJobFlags.QUEUED
     }
     queueFlush()
   }
@@ -120,14 +106,11 @@ export function invalidateJob(job: SchedulerJob) {
 
 export function queuePostFlushCb(cb: SchedulerJobs) {
   if (!isArray(cb)) {
-    if (
-      !activePostFlushCbs ||
-      !activePostFlushCbs.includes(
-        cb,
-        cb.allowRecurse ? postFlushIndex + 1 : postFlushIndex,
-      )
-    ) {
+    if (!(cb.flags! & SchedulerJobFlags.QUEUED)) {
       pendingPostFlushCbs.push(cb)
+      if (!(cb.flags! & SchedulerJobFlags.ALLOW_RECURSE)) {
+        cb.flags! |= SchedulerJobFlags.QUEUED
+      }
     }
   } else {
     // if cb is an array, it is a component lifecycle hook which can only be
@@ -149,7 +132,7 @@ export function flushPreFlushCbs(
   }
   for (; i < queue.length; i++) {
     const cb = queue[i]
-    if (cb && cb.pre) {
+    if (cb && cb.flags! & SchedulerJobFlags.PRE) {
       if (instance && cb.id !== instance.uid) {
         continue
       }
@@ -159,6 +142,7 @@ export function flushPreFlushCbs(
       queue.splice(i, 1)
       i--
       cb()
+      cb.flags! &= ~SchedulerJobFlags.QUEUED
     }
   }
 }
@@ -193,6 +177,7 @@ export function flushPostFlushCbs(seen?: CountMap) {
         continue
       }
       activePostFlushCbs[postFlushIndex]()
+      activePostFlushCbs[postFlushIndex].flags! &= ~SchedulerJobFlags.QUEUED
     }
     activePostFlushCbs = null
     postFlushIndex = 0
@@ -205,8 +190,10 @@ const getId = (job: SchedulerJob): number =>
 const comparator = (a: SchedulerJob, b: SchedulerJob): number => {
   const diff = getId(a) - getId(b)
   if (diff === 0) {
-    if (a.pre && !b.pre) return -1
-    if (b.pre && !a.pre) return 1
+    const isAPre = a.flags! & SchedulerJobFlags.PRE
+    const isBPre = b.flags! & SchedulerJobFlags.PRE
+    if (isAPre && !isBPre) return -1
+    if (isBPre && !isAPre) return 1
   }
   return diff
 }
@@ -239,11 +226,12 @@ function flushJobs(seen?: CountMap) {
   try {
     for (flushIndex = 0; flushIndex < queue.length; flushIndex++) {
       const job = queue[flushIndex]
-      if (job && job.active !== false) {
+      if (job && !(job.flags! & SchedulerJobFlags.DISPOSED)) {
         if (__DEV__ && check(job)) {
           continue
         }
         callWithErrorHandling(job, null, ErrorCodes.SCHEDULER)
+        job.flags! &= ~SchedulerJobFlags.QUEUED
       }
     }
   } finally {
@@ -290,24 +278,25 @@ function checkRecursiveUpdates(seen: CountMap, fn: SchedulerJob) {
 
 export type SchedulerFactory = (
   instance: ComponentInternalInstance | null,
-) => Scheduler
+) => WatchScheduler
 
 export const createSyncScheduler: SchedulerFactory =
-  instance => (job, effect, isInit) => {
-    if (isInit) {
-      effect.run()
+  instance => (job, effect, immediateFirstRun, hasCb) => {
+    if (immediateFirstRun) {
+      effect.flags |= EffectFlags.NO_BATCH
+      if (!hasCb) effect.run()
     } else {
       job()
     }
   }
 
 export const createPreScheduler: SchedulerFactory =
-  instance => (job, effect, isInit) => {
-    if (isInit) {
-      effect.run()
-    } else {
-      job.pre = true
+  instance => (job, effect, immediateFirstRun, hasCb) => {
+    if (!immediateFirstRun) {
+      job.flags! |= SchedulerJobFlags.PRE
       if (instance) job.id = instance.uid
       queueJob(job)
+    } else if (!hasCb) {
+      effect.run()
     }
   }

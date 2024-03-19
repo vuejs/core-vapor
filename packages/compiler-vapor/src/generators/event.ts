@@ -1,6 +1,6 @@
 import { fnExpRE, isMemberExpression } from '@vue/compiler-dom'
 import type { CodegenContext } from '../generate'
-import type { SetEventIRNode } from '../ir'
+import type { SetDynamicEventsIRNode, SetEventIRNode } from '../ir'
 import { genExpression } from './expression'
 import {
   type CodeFragment,
@@ -16,7 +16,7 @@ export function genSetEvent(
   context: CodegenContext,
 ): CodeFragment[] {
   const { vaporHelper, options } = context
-  const { element, key, keyOverride, value, modifiers, delegate } = oper
+  const { element, key, keyOverride, value, modifiers, delegate, effect } = oper
 
   const name = genName()
   const handler = genEventHandler()
@@ -77,7 +77,7 @@ export function genSetEvent(
 
   function genEventOptions(): CodeFragment[] | undefined {
     let { options, keys, nonKeys } = modifiers
-    if (!options.length && !nonKeys.length && !keys.length) return
+    if (!options.length && !nonKeys.length && !keys.length && !effect) return
 
     return genMulti(
       [
@@ -87,9 +87,25 @@ export function genSetEvent(
       ],
       !!nonKeys.length && ['modifiers: ', genArrayExpression(nonKeys)],
       !!keys.length && ['keys: ', genArrayExpression(keys)],
+      effect && ['effect: true'],
       ...options.map((option): CodeFragment[] => [`${option}: true`]),
     )
   }
+}
+
+export function genSetDynamicEvents(
+  oper: SetDynamicEventsIRNode,
+  context: CodegenContext,
+): CodeFragment[] {
+  const { vaporHelper } = context
+  return [
+    NEWLINE,
+    ...genCall(
+      vaporHelper('setDynamicEvents'),
+      `n${oper.element}`,
+      genExpression(oper.event, context),
+    ),
+  ]
 }
 
 function genArrayExpression(elements: string[]) {

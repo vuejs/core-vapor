@@ -7,11 +7,11 @@ import {
   renderEffect,
   setText,
   template,
-  unmountComponent,
   withDirectives,
 } from '../src'
 import type { Mock } from 'vitest'
 import { makeRender } from './_utils'
+import { unmountComponent } from '../src/apiRender'
 
 const define = makeRender()
 

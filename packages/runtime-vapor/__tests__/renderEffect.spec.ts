@@ -5,7 +5,6 @@ import {
   onUpdated,
   ref,
   renderEffect,
-  renderWatch,
   template,
   watchEffect,
   watchPostEffect,
@@ -31,31 +30,31 @@ const createDemo = (setupFn: () => any, renderFn: (ctx: any) => any) =>
     },
   })
 
-describe('renderWatch', () => {
-  test('effect', async () => {
+describe('renderEffect', () => {
+  test('basic', async () => {
     let dummy: any
     const source = ref(0)
     renderEffect(() => {
       dummy = source.value
     })
+    expect(dummy).toBe(0)
     await nextTick()
     expect(dummy).toBe(0)
-    source.value++
-    await nextTick()
-    expect(dummy).toBe(1)
-  })
 
-  test('watch', async () => {
-    let dummy: any
-    const source = ref(0)
-    renderWatch(source, () => {
-      dummy = source.value
-    })
-    await nextTick()
-    expect(dummy).toBe(undefined)
     source.value++
+    expect(dummy).toBe(0)
     await nextTick()
     expect(dummy).toBe(1)
+
+    source.value++
+    expect(dummy).toBe(1)
+    await nextTick()
+    expect(dummy).toBe(2)
+
+    source.value++
+    expect(dummy).toBe(2)
+    await nextTick()
+    expect(dummy).toBe(3)
   })
 
   test('should run with the scheduling order', async () => {
@@ -103,13 +102,6 @@ describe('renderWatch', () => {
           calls.push(`renderEffect ${current}`)
           onEffectCleanup(() => calls.push(`renderEffect cleanup ${current}`))
         })
-        renderWatch(
-          () => _ctx.renderSource,
-          value => {
-            calls.push(`renderWatch ${value}`)
-            onEffectCleanup(() => calls.push(`renderWatch cleanup ${value}`))
-          },
-        )
       },
     ).render()
     const { change, changeRender } = instance.setupState as any
@@ -131,10 +123,29 @@ describe('renderWatch', () => {
       'beforeUpdate 1',
       'renderEffect cleanup 0',
       'renderEffect 1',
-      'renderWatch 1',
       'post cleanup 0',
       'post 1',
       'updated 1',
+    ])
+    calls.length = 0
+
+    // Update
+    changeRender()
+    change()
+
+    expect(calls).toEqual(['sync cleanup 1', 'sync 2'])
+    calls.length = 0
+
+    await nextTick()
+    expect(calls).toEqual([
+      'pre cleanup 1',
+      'pre 2',
+      'beforeUpdate 2',
+      'renderEffect cleanup 1',
+      'renderEffect 2',
+      'post cleanup 1',
+      'post 2',
+      'updated 2',
     ])
   })
 

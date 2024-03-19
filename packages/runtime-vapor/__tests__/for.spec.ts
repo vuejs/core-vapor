@@ -7,10 +7,10 @@ import {
   ref,
   renderEffect,
   template,
-  unmountComponent,
   withDirectives,
 } from '../src'
 import { makeRender } from './_utils'
+import { unmountComponent } from '../src/apiRender'
 
 const define = makeRender()
 

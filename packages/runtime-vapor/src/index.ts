@@ -29,13 +29,15 @@ export {
   // effect
   stop,
   ReactiveEffect,
-  getCurrentEffect,
   onEffectCleanup,
   // effect scope
   effectScope,
   EffectScope,
   getCurrentScope,
   onScopeDispose,
+  // baseWatch
+  onWatcherCleanup,
+  getCurrentWatcher,
 } from '@vue/reactivity'
 
 export { nextTick } from './scheduler'
@@ -47,8 +49,7 @@ export {
   type FunctionalComponent,
   type SetupFn,
 } from './component'
-export { render, unmountComponent } from './render'
-export { renderEffect, renderWatch } from './renderWatch'
+export { renderEffect } from './renderEffect'
 export {
   watch,
   watchEffect,
@@ -63,7 +64,6 @@ export {
 } from './apiWatch'
 export {
   withDirectives,
-  resolveDirective,
   type Directive,
   type DirectiveBinding,
   type DirectiveHook,
@@ -85,7 +85,7 @@ export {
   setDynamicProp,
   setDynamicProps,
 } from './dom/prop'
-export { on, delegate, delegateEvents } from './dom/event'
+export { on, delegate, delegateEvents, setDynamicEvents } from './dom/event'
 export { setRef } from './dom/templateRef'
 
 export { defineComponent } from './apiDefineComponent'
@@ -103,8 +103,17 @@ export {
   onErrorCaptured,
   // onServerPrefetch,
 } from './apiLifecycle'
-export { createIf } from './if'
-export { createFor } from './for'
+export {
+  createVaporApp,
+  type App,
+  type AppConfig,
+  type AppContext,
+} from './apiCreateVaporApp'
+export { createIf } from './apiCreateIf'
+export { createFor } from './apiCreateFor'
+export { createComponent } from './apiCreateComponent'
+
+export { resolveComponent, resolveDirective } from './helpers/resolveAssets'
 
 // **Internal** DOM-only runtime directive helpers
 export {

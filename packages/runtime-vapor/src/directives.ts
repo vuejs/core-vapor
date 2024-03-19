@@ -8,7 +8,7 @@ import {
   traverse,
 } from '@vue/reactivity'
 import { VaporErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import { renderEffect } from './renderWatch'
+import { renderEffect } from './renderEffect'
 
 export type DirectiveModifiers<M extends string = string> = Record<M, boolean>
 
@@ -134,7 +134,6 @@ export function withDirectives<T extends Node>(
         const baseSource = source
         source = () => traverse(baseSource(), deep)
       }
-      // callback will be overridden by middleware
       renderEffect(source)
     }
   }
@@ -177,8 +176,4 @@ function callDirectiveHook(
     binding,
   ])
   resetTracking()
-}
-
-export function resolveDirective() {
-  // TODO
 }

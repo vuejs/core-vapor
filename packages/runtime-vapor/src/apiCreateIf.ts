@@ -1,10 +1,10 @@
-import { type Block, type Fragment, fragmentKey } from './render'
+import { type Block, type Fragment, fragmentKey } from './apiRender'
 import { type EffectScope, effectScope } from '@vue/reactivity'
 import { createComment, createTextNode, insert, remove } from './dom/element'
 import { queuePostRenderEffect } from './scheduler'
 import {
+  type DirectiveBinding,
   type DirectiveBindingsMap,
-  type DirectiveHook,
   invokeDirectiveHook,
   setDirectivesWithScopeMap,
   withDirectives,
@@ -44,7 +44,40 @@ export const createIf = (
   //   setCurrentHydrationNode(hydrationNode!)
   // }
 
-  const hook: DirectiveHook = (_, { value, oldValue }) => {
+  withDirectives(anchor, [
+    [
+      {
+        created: hook,
+        beforeUpdate: hook,
+
+        beforeMount: () => {
+          if (instance?.isMounted) return
+          const currentDirectives = directives
+          if (currentDirectives) {
+            invokeDirectiveHook(instance, 'beforeMount', currentDirectives)
+            queuePostRenderEffect(() => {
+              invokeDirectiveHook(instance, 'mounted', currentDirectives)
+            })
+          }
+        },
+        beforeUnmount: () =>
+          directives &&
+          invokeDirectiveHook(instance, 'beforeUnmount', directives),
+        unmounted: () =>
+          directives && invokeDirectiveHook(instance, 'unmounted', directives),
+      },
+      () => !!condition(),
+    ],
+  ])
+
+  // TODO: SSR
+  // if (isHydrating) {
+  //   parent!.insertBefore(anchor, currentHydrationNode)
+  // }
+
+  return fragment
+
+  function hook(node: any, { value, oldValue }: DirectiveBinding) {
     if (value === oldValue) {
       if (directives) {
         const currentDirs = directives
@@ -91,37 +124,4 @@ export const createIf = (
       fragment.nodes = []
     }
   }
-
-  withDirectives(anchor, [
-    [
-      {
-        created: hook,
-        beforeUpdate: hook,
-
-        beforeMount: () => {
-          if (instance?.isMounted) return
-          const currentDirectives = directives
-          if (currentDirectives) {
-            invokeDirectiveHook(instance, 'beforeMount', currentDirectives)
-            queuePostRenderEffect(() => {
-              invokeDirectiveHook(instance, 'mounted', currentDirectives)
-            })
-          }
-        },
-        beforeUnmount: () =>
-          directives &&
-          invokeDirectiveHook(instance, 'beforeUnmount', directives),
-        unmounted: () =>
-          directives && invokeDirectiveHook(instance, 'unmounted', directives),
-      },
-      () => !!condition(),
-    ],
-  ])
-
-  // TODO: SSR
-  // if (isHydrating) {
-  //   parent!.insertBefore(anchor, currentHydrationNode)
-  // }
-
-  return fragment
 }

@@ -6,7 +6,7 @@
 import type { ComponentInternalInstance } from './component'
 import { isFunction, isPromise } from '@vue/shared'
 import { warn } from './warning'
-import { VaporLifecycleHooks } from './enums'
+import { VaporLifecycleHooks } from './apiLifecycle'
 import { BaseWatchErrorCodes } from '@vue/reactivity'
 
 // contexts where user provided function may be executed, in addition to
@@ -39,8 +39,6 @@ export type ErrorTypes =
 
 export const ErrorTypeStrings: Record<ErrorTypes, string> = {
   // [VaporLifecycleHooks.SERVER_PREFETCH]: 'serverPrefetch hook',
-  [VaporLifecycleHooks.BEFORE_CREATE]: 'beforeCreate hook',
-  [VaporLifecycleHooks.CREATED]: 'created hook',
   [VaporLifecycleHooks.BEFORE_MOUNT]: 'beforeMount hook',
   [VaporLifecycleHooks.MOUNTED]: 'mounted hook',
   [VaporLifecycleHooks.BEFORE_UPDATE]: 'beforeUpdate hook',
