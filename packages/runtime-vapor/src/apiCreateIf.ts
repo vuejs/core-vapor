@@ -1,25 +1,18 @@
 import { type Block, type Fragment, fragmentKey } from './apiRender'
-import {
-  EffectFlags,
-  type EffectScope,
-  ReactiveEffect,
-  type SchedulerJob,
-  effectScope,
-} from '@vue/reactivity'
+import { type EffectScope, ReactiveEffect, effectScope } from '@vue/reactivity'
 import { createComment, createTextNode, insert, remove } from './dom/element'
 import { queueJob, queuePostRenderEffect } from './scheduler'
 import {
   type Directive,
-  type DirectiveBinding,
   type DirectiveBindingsMap,
+  createUpdatingSchedulerJob,
   getDirectivesMap,
   invokeDirectiveHook,
   setDirectivesWithScopeMap,
 } from './directives'
-import { getCurrentInstance, setCurrentInstance } from './component'
+import { getCurrentInstance } from './component'
 import { warn } from './warning'
-import { VaporErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import { invokeArrayFns } from '@vue/shared'
+import { VaporErrorCodes, callWithErrorHandling } from './errorHandling'
 
 type BlockFn = () => Block
 
@@ -37,17 +30,15 @@ export const createIf = (
   let block: Block | undefined
   let scope: EffectScope | undefined
   let directives: DirectiveBindingsMap | undefined
-  let triggered = true
+  let isTriggered = true
   const anchor = __DEV__ ? createComment('if') : createTextNode()
   const fragment: Fragment = {
     nodes: [],
     anchor,
     [fragmentKey]: true,
   }
-  const instance = getCurrentInstance()
-  const parentBindings = getDirectivesMap()
-  const bindings: DirectiveBinding[] = []
 
+  const instance = getCurrentInstance()
   if (!instance) {
     warn('createIf() can only be used inside setup()')
   }
@@ -76,27 +67,22 @@ export const createIf = (
     unmounted: () =>
       directives && invokeDirectiveHook(instance, 'unmounted', directives),
   }
-  const binding: DirectiveBinding = {
-    dir,
-    instance: instance!,
-    value: null,
-    oldValue: undefined,
-  }
-
-  parentBindings?.set(anchor, bindings)
-  bindings.push(binding)
+  getDirectivesMap()!.set(anchor, [
+    {
+      dir,
+      instance: instance!,
+      value: null,
+      oldValue: undefined,
+    },
+  ])
 
   const effect = new ReactiveEffect(() =>
-    callWithAsyncErrorHandling(
-      condition,
-      instance,
-      VaporErrorCodes.RENDER_FUNCTION,
-    ),
+    callWithErrorHandling(condition, instance, VaporErrorCodes.RENDER_FUNCTION),
   )
-
+  const job = createUpdatingSchedulerJob(instance, effect)
+  if (instance) job.id = instance.uid
   effect.scheduler = () => {
-    triggered = true
-    if (instance) (job as SchedulerJob).id = instance.uid
+    isTriggered = true
     queueJob(job)
   }
 
@@ -110,7 +96,7 @@ export const createIf = (
   return fragment
 
   function hook() {
-    if (!triggered || (newValue = !!effect.run()) === oldValue) {
+    if (!isTriggered || (newValue = !!effect.run()) === oldValue) {
       if (directives) {
         const currentDirs = directives
         invokeDirectiveHook(instance, 'beforeUpdate', currentDirs)
@@ -120,7 +106,7 @@ export const createIf = (
       }
       return
     }
-    triggered = false
+    isTriggered = false
 
     parent ||= anchor.parentNode
     if (block) {
@@ -155,40 +141,6 @@ export const createIf = (
     } else {
       scope = block = directives = undefined
       fragment.nodes = []
-    }
-  }
-
-  function job() {
-    if (!(effect.flags & EffectFlags.ACTIVE) || !effect.dirty) {
-      return
-    }
-
-    if (instance?.isMounted && !instance.isUpdating) {
-      instance.isUpdating = true
-      const reset = setCurrentInstance(instance)
-
-      const { bu, u, dirs } = instance
-      // beforeUpdate hook
-      if (bu) {
-        invokeArrayFns(bu)
-      }
-      if (dirs) {
-        invokeDirectiveHook(instance, 'beforeUpdate', dirs)
-      }
-
-      queuePostRenderEffect(() => {
-        instance.isUpdating = false
-        const reset = setCurrentInstance(instance)
-        if (dirs) {
-          invokeDirectiveHook(instance, 'updated', dirs)
-        }
-        // updated hook
-        if (u) {
-          queuePostRenderEffect(u)
-        }
-        reset()
-      })
-      reset()
     }
   }
 }

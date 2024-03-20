@@ -1,7 +1,6 @@
 import {
-  type BaseWatchErrorCodes,
   type EffectScope,
-  baseWatch,
+  ReactiveEffect,
   effectScope,
   isReactive,
   traverse,
@@ -15,16 +14,16 @@ import {
 } from './dom/element'
 import { type Block, type Fragment, fragmentKey } from './apiRender'
 import {
-  type DirectiveBinding,
+  type Directive,
   type DirectiveBindingsMap,
   type DirectiveHookName,
+  createUpdatingSchedulerJob,
   getDirectivesMap,
   invokeDirectiveHook,
   setDirectivesWithScopeMap,
-  withDirectives,
 } from './directives'
-import { queuePostRenderEffect } from './scheduler'
-import { handleError } from './errorHandling'
+import { queueJob, queuePostRenderEffect } from './scheduler'
+import { VaporErrorCodes, callWithErrorHandling } from './errorHandling'
 import { warn } from './warning'
 import { getCurrentInstance } from './component'
 import { componentKey } from './component'
@@ -52,6 +51,7 @@ export const createFor = (
   let oldBlocks: ForBlock[] = []
   let newBlocks: ForBlock[]
   let parent: ParentNode | undefined | null
+  let isTriggered = true
   const parentAnchor = __DEV__ ? createComment('for') : createTextNode()
   const ref: Fragment = {
     nodes: oldBlocks,
@@ -66,19 +66,20 @@ export const createFor = (
   const directivesList: DirectiveBindingsMap[] = []
 
   const update = getMemo ? updateWithMemo : updateWithoutMemo
-  let isSourceChanged = false
 
-  baseWatch(
-    () => {
-      isSourceChanged = true
-      return traverse(src(), 1)
-    },
-    null,
-    {
-      onError: (err: unknown, type: BaseWatchErrorCodes) =>
-        handleError(err, instance, type),
-    },
+  const effect = new ReactiveEffect(() =>
+    callWithErrorHandling(
+      () => traverse(src(), 1),
+      instance,
+      VaporErrorCodes.RENDER_FUNCTION,
+    ),
   )
+  const job = createUpdatingSchedulerJob(instance, effect)
+  if (instance) job.id = instance.uid
+  effect.scheduler = () => {
+    isTriggered = true
+    queueJob(job)
+  }
 
   const relayDirectiveHook = (name: DirectiveHookName) => {
     for (const dirs of directivesList) {
@@ -86,26 +87,29 @@ export const createFor = (
     }
   }
 
-  withDirectives(parentAnchor, [
-    [
-      {
-        deep: 1,
-        created: hook,
-        beforeUpdate: hook,
+  const dir: Directive = {
+    beforeUpdate: hook,
 
-        beforeMount: () => {
-          if (instance?.isMounted) return
-          relayDirectiveHook('beforeMount')
-          queuePostRenderEffect(() => {
-            relayDirectiveHook('mounted')
-          })
-        },
-        beforeUnmount: () => relayDirectiveHook('beforeUnmount'),
-        unmounted: () => relayDirectiveHook('unmounted'),
-      },
-      src,
-    ],
+    beforeMount: () => {
+      if (instance?.isMounted) return
+      relayDirectiveHook('beforeMount')
+      queuePostRenderEffect(() => {
+        relayDirectiveHook('mounted')
+      })
+    },
+    beforeUnmount: () => relayDirectiveHook('beforeUnmount'),
+    unmounted: () => relayDirectiveHook('unmounted'),
+  }
+  getDirectivesMap()!.set(parentAnchor, [
+    {
+      dir,
+      instance: instance!,
+      value: null,
+      oldValue: undefined,
+    },
   ])
+
+  hook()
 
   return ref
 
@@ -284,8 +288,8 @@ export const createFor = (
     return null!
   }
 
-  function hook(_: unknown, binding: DirectiveBinding<unknown, Source>) {
-    if (!isSourceChanged) {
+  function hook() {
+    if (!isTriggered) {
       for (const dirs of directivesList) {
         invokeDirectiveHook(instance, 'beforeUpdate', dirs)
         queuePostRenderEffect(() => {
@@ -294,9 +298,9 @@ export const createFor = (
       }
       return
     }
-    isSourceChanged = false
+    isTriggered = false
 
-    const source = binding.value
+    const source = effect.run()
     const newLength = getLength(source)
     const oldLength = oldBlocks.length
     newBlocks = new Array(newLength)

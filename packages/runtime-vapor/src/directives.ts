@@ -1,14 +1,25 @@
-import { isFunction } from '@vue/shared'
-import { type ComponentInternalInstance, getCurrentInstance } from './component'
+import { invokeArrayFns, isFunction } from '@vue/shared'
 import {
+  type ComponentInternalInstance,
+  getCurrentInstance,
+  setCurrentInstance,
+} from './component'
+import {
+  EffectFlags,
   type EffectScope,
+  ReactiveEffect,
+  type SchedulerJob,
   getCurrentScope,
   pauseTracking,
   resetTracking,
   traverse,
 } from '@vue/reactivity'
-import { VaporErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import { renderEffect } from './renderEffect'
+import {
+  VaporErrorCodes,
+  callWithAsyncErrorHandling,
+  callWithErrorHandling,
+} from './errorHandling'
+import { queueJob, queuePostRenderEffect } from './scheduler'
 
 export type DirectiveModifiers<M extends string = string> = Record<M, boolean>
 
@@ -117,25 +128,36 @@ export function withDirectives<T extends Node>(
     const binding: DirectiveBinding = {
       dir,
       instance,
-      source,
       value: null, // set later
       oldValue: undefined,
       arg,
       modifiers,
     }
-    bindings.push(binding)
 
-    callDirectiveHook(node, binding, instance, 'created')
-
-    // register source
     if (source) {
       if (dir.deep) {
         const deep = dir.deep === true ? undefined : dir.deep
         const baseSource = source
         source = () => traverse(baseSource(), deep)
       }
-      renderEffect(source)
+
+      const effect = new ReactiveEffect(() =>
+        callWithErrorHandling(
+          source!,
+          instance,
+          VaporErrorCodes.RENDER_FUNCTION,
+        ),
+      )
+      const job = createUpdatingSchedulerJob(instance, effect)
+      job.id = instance.uid
+      effect.scheduler = () => queueJob(job)
+
+      binding.source = effect.run.bind(effect)
     }
+
+    bindings.push(binding)
+
+    callDirectiveHook(node, binding, instance, 'created')
   }
 
   return node
@@ -176,4 +198,44 @@ function callDirectiveHook(
     binding,
   ])
   resetTracking()
+}
+
+export function createUpdatingSchedulerJob(
+  instance: ComponentInternalInstance | null,
+  effect: ReactiveEffect,
+): SchedulerJob {
+  return job
+  function job() {
+    if (!(effect.flags & EffectFlags.ACTIVE) || !effect.dirty) {
+      return
+    }
+
+    if (instance?.isMounted && !instance.isUpdating) {
+      instance.isUpdating = true
+      const reset = setCurrentInstance(instance)
+
+      const { bu, u, dirs } = instance
+      // beforeUpdate hook
+      if (bu) {
+        invokeArrayFns(bu)
+      }
+      if (dirs) {
+        invokeDirectiveHook(instance, 'beforeUpdate', dirs)
+      }
+
+      queuePostRenderEffect(() => {
+        instance.isUpdating = false
+        const reset = setCurrentInstance(instance)
+        if (dirs) {
+          invokeDirectiveHook(instance, 'updated', dirs)
+        }
+        // updated hook
+        if (u) {
+          queuePostRenderEffect(u)
+        }
+        reset()
+      })
+      reset()
+    }
+  }
 }

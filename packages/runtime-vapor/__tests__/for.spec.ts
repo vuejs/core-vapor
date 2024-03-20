@@ -201,6 +201,7 @@ describe('createFor', () => {
     const list = ref([0])
     const update = ref(0)
     const add = () => list.value.push(list.value.length)
+    const spySrcFn = vi.fn(() => list.value)
 
     const vDirective: Directive = {
       created: (el, { value }) => calls.push(`${value} created`),
@@ -214,15 +215,12 @@ describe('createFor', () => {
 
     const t0 = template('<p></p>')
     const { instance } = define(() => {
-      const n1 = createFor(
-        () => list.value,
-        block => {
-          const n2 = t0()
-          const n3 = children(n2, 0)
-          withDirectives(n3, [[vDirective, () => block.s[0]]])
-          return [n2, NOOP]
-        },
-      )
+      const n1 = createFor(spySrcFn, block => {
+        const n2 = t0()
+        const n3 = children(n2, 0)
+        withDirectives(n3, [[vDirective, () => block.s[0]]])
+        return [n2, NOOP]
+      })
       renderEffect(() => update.value)
       return [n1]
     }).render()
@@ -231,6 +229,7 @@ describe('createFor', () => {
     // `${item index} ${hook name}`
     expect(calls).toEqual(['0 created', '0 beforeMount', '0 mounted'])
     calls.length = 0
+    expect(spySrcFn).toHaveBeenCalledTimes(1)
 
     add()
     await nextTick()
@@ -242,6 +241,7 @@ describe('createFor', () => {
       '1 mounted',
     ])
     calls.length = 0
+    expect(spySrcFn).toHaveBeenCalledTimes(2)
 
     list.value.reverse()
     await nextTick()
@@ -250,9 +250,11 @@ describe('createFor', () => {
     expect(calls[1]).includes('beforeUpdate')
     expect(calls[2]).includes('updated')
     expect(calls[3]).includes('updated')
+    expect(spySrcFn).toHaveBeenCalledTimes(3)
     list.value.reverse()
     await nextTick()
     calls.length = 0
+    expect(spySrcFn).toHaveBeenCalledTimes(4)
 
     update.value++
     await nextTick()
@@ -263,6 +265,7 @@ describe('createFor', () => {
       '1 updated',
     ])
     calls.length = 0
+    expect(spySrcFn).toHaveBeenCalledTimes(4)
 
     list.value.pop()
     await nextTick()
@@ -273,8 +276,10 @@ describe('createFor', () => {
       '1 unmounted',
     ])
     calls.length = 0
+    expect(spySrcFn).toHaveBeenCalledTimes(5)
 
     unmountComponent(instance)
     expect(calls).toEqual(['0 beforeUnmount', '0 unmounted'])
+    expect(spySrcFn).toHaveBeenCalledTimes(5)
   })
 })
