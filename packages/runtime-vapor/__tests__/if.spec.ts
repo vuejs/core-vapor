@@ -27,6 +27,8 @@ describe('createIf', () => {
     let spyElseFn: Mock<any, any>
     const count = ref(0)
 
+    const spyConditionFn = vi.fn(() => count.value)
+
     // templates can be reused through caching.
     const t0 = template('<div></div>')
     const t1 = template('<p></p>')
@@ -37,7 +39,7 @@ describe('createIf', () => {
 
       insert(
         createIf(
-          () => count.value,
+          spyConditionFn,
           // v-if
           (spyIfFn ||= vi.fn(() => {
             const n2 = t1()
@@ -58,24 +60,28 @@ describe('createIf', () => {
     }).render()
 
     expect(host.innerHTML).toBe('<div><p>zero</p><!--if--></div>')
+    expect(spyConditionFn).toHaveBeenCalledTimes(1)
     expect(spyIfFn!).toHaveBeenCalledTimes(0)
     expect(spyElseFn!).toHaveBeenCalledTimes(1)
 
     count.value++
     await nextTick()
     expect(host.innerHTML).toBe('<div><p>1</p><!--if--></div>')
+    expect(spyConditionFn).toHaveBeenCalledTimes(2)
     expect(spyIfFn!).toHaveBeenCalledTimes(1)
     expect(spyElseFn!).toHaveBeenCalledTimes(1)
 
     count.value++
     await nextTick()
     expect(host.innerHTML).toBe('<div><p>2</p><!--if--></div>')
+    expect(spyConditionFn).toHaveBeenCalledTimes(3)
     expect(spyIfFn!).toHaveBeenCalledTimes(1)
     expect(spyElseFn!).toHaveBeenCalledTimes(1)
 
     count.value = 0
     await nextTick()
     expect(host.innerHTML).toBe('<div><p>zero</p><!--if--></div>')
+    expect(spyConditionFn).toHaveBeenCalledTimes(4)
     expect(spyIfFn!).toHaveBeenCalledTimes(1)
     expect(spyElseFn!).toHaveBeenCalledTimes(2)
   })
@@ -133,6 +139,10 @@ describe('createIf', () => {
     const show1 = ref(true)
     const show2 = ref(true)
     const update = ref(0)
+
+    const spyConditionFn1 = vi.fn(() => show1.value)
+    const spyConditionFn2 = vi.fn(() => show2.value)
+
     const vDirective: any = {
       created: (el: any, { value }: any) => calls.push(`${value} created`),
       beforeMount: (el: any, { value }: any) =>
@@ -149,7 +159,7 @@ describe('createIf', () => {
     const t0 = template('<p></p>')
     const { instance } = define(() => {
       const n1 = createIf(
-        () => show1.value,
+        spyConditionFn1,
         () => {
           const n2 = t0()
           withDirectives(children(n2, 0), [
@@ -159,7 +169,7 @@ describe('createIf', () => {
         },
         () =>
           createIf(
-            () => show2.value,
+            spyConditionFn2,
             () => {
               const n2 = t0()
               withDirectives(children(n2, 0), [[vDirective, () => '2']])
@@ -178,6 +188,8 @@ describe('createIf', () => {
     await nextTick()
     expect(calls).toEqual(['1 created', '1 beforeMount', '1 mounted'])
     calls.length = 0
+    expect(spyConditionFn1).toHaveBeenCalledTimes(1)
+    expect(spyConditionFn2).toHaveBeenCalledTimes(0)
 
     show1.value = false
     await nextTick()
@@ -189,6 +201,8 @@ describe('createIf', () => {
       '2 mounted',
     ])
     calls.length = 0
+    expect(spyConditionFn1).toHaveBeenCalledTimes(2)
+    expect(spyConditionFn2).toHaveBeenCalledTimes(1)
 
     show2.value = false
     await nextTick()
@@ -200,6 +214,8 @@ describe('createIf', () => {
       '3 mounted',
     ])
     calls.length = 0
+    expect(spyConditionFn1).toHaveBeenCalledTimes(2)
+    expect(spyConditionFn2).toHaveBeenCalledTimes(2)
 
     show1.value = true
     await nextTick()
@@ -211,13 +227,19 @@ describe('createIf', () => {
       '1 mounted',
     ])
     calls.length = 0
+    expect(spyConditionFn1).toHaveBeenCalledTimes(3)
+    expect(spyConditionFn2).toHaveBeenCalledTimes(2)
 
     update.value++
     await nextTick()
     expect(calls).toEqual(['1 beforeUpdate', '1 updated'])
     calls.length = 0
+    expect(spyConditionFn1).toHaveBeenCalledTimes(3)
+    expect(spyConditionFn2).toHaveBeenCalledTimes(2)
 
     unmountComponent(instance)
     expect(calls).toEqual(['1 beforeUnmount', '1 unmounted'])
+    expect(spyConditionFn1).toHaveBeenCalledTimes(3)
+    expect(spyConditionFn2).toHaveBeenCalledTimes(2)
   })
 })

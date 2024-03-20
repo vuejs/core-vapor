@@ -1,16 +1,25 @@
 import { type Block, type Fragment, fragmentKey } from './apiRender'
-import { type EffectScope, effectScope } from '@vue/reactivity'
-import { createComment, createTextNode, insert, remove } from './dom/element'
-import { queuePostRenderEffect } from './scheduler'
 import {
+  EffectFlags,
+  type EffectScope,
+  ReactiveEffect,
+  type SchedulerJob,
+  effectScope,
+} from '@vue/reactivity'
+import { createComment, createTextNode, insert, remove } from './dom/element'
+import { queueJob, queuePostRenderEffect } from './scheduler'
+import {
+  type Directive,
   type DirectiveBinding,
   type DirectiveBindingsMap,
+  getDirectivesMap,
   invokeDirectiveHook,
   setDirectivesWithScopeMap,
-  withDirectives,
 } from './directives'
-import { getCurrentInstance } from './component'
+import { getCurrentInstance, setCurrentInstance } from './component'
 import { warn } from './warning'
+import { VaporErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
+import { invokeArrayFns } from '@vue/shared'
 
 type BlockFn = () => Block
 
@@ -21,19 +30,24 @@ export const createIf = (
   b2?: BlockFn,
   // hydrationNode?: Node,
 ): Fragment => {
+  let newValue: any
+  let oldValue: any
   let branch: BlockFn | undefined
   let parent: ParentNode | undefined | null
   let block: Block | undefined
   let scope: EffectScope | undefined
   let directives: DirectiveBindingsMap | undefined
+  let triggered = true
   const anchor = __DEV__ ? createComment('if') : createTextNode()
   const fragment: Fragment = {
     nodes: [],
     anchor,
     [fragmentKey]: true,
   }
-
   const instance = getCurrentInstance()
+  const parentBindings = getDirectivesMap()
+  const bindings: DirectiveBinding[] = []
+
   if (!instance) {
     warn('createIf() can only be used inside setup()')
   }
@@ -44,31 +58,49 @@ export const createIf = (
   //   setCurrentHydrationNode(hydrationNode!)
   // }
 
-  withDirectives(anchor, [
-    [
-      {
-        created: hook,
-        beforeUpdate: hook,
+  const dir: Directive = {
+    beforeUpdate: hook,
 
-        beforeMount: () => {
-          if (instance?.isMounted) return
-          const currentDirectives = directives
-          if (currentDirectives) {
-            invokeDirectiveHook(instance, 'beforeMount', currentDirectives)
-            queuePostRenderEffect(() => {
-              invokeDirectiveHook(instance, 'mounted', currentDirectives)
-            })
-          }
-        },
-        beforeUnmount: () =>
-          directives &&
-          invokeDirectiveHook(instance, 'beforeUnmount', directives),
-        unmounted: () =>
-          directives && invokeDirectiveHook(instance, 'unmounted', directives),
-      },
-      () => !!condition(),
-    ],
-  ])
+    beforeMount: () => {
+      if (instance?.isMounted) return
+      const currentDirectives = directives
+      if (currentDirectives) {
+        invokeDirectiveHook(instance, 'beforeMount', currentDirectives)
+        queuePostRenderEffect(() => {
+          invokeDirectiveHook(instance, 'mounted', currentDirectives)
+        })
+      }
+    },
+    beforeUnmount: () =>
+      directives && invokeDirectiveHook(instance, 'beforeUnmount', directives),
+    unmounted: () =>
+      directives && invokeDirectiveHook(instance, 'unmounted', directives),
+  }
+  const binding: DirectiveBinding = {
+    dir,
+    instance: instance!,
+    value: null,
+    oldValue: undefined,
+  }
+
+  parentBindings?.set(anchor, bindings)
+  bindings.push(binding)
+
+  const effect = new ReactiveEffect(() =>
+    callWithAsyncErrorHandling(
+      condition,
+      instance,
+      VaporErrorCodes.RENDER_FUNCTION,
+    ),
+  )
+
+  effect.scheduler = () => {
+    triggered = true
+    if (instance) (job as SchedulerJob).id = instance.uid
+    queueJob(job)
+  }
+
+  hook()
 
   // TODO: SSR
   // if (isHydrating) {
@@ -77,8 +109,8 @@ export const createIf = (
 
   return fragment
 
-  function hook(node: any, { value, oldValue }: DirectiveBinding) {
-    if (value === oldValue) {
+  function hook() {
+    if (!triggered || (newValue = !!effect.run()) === oldValue) {
       if (directives) {
         const currentDirs = directives
         invokeDirectiveHook(instance, 'beforeUpdate', currentDirs)
@@ -88,6 +120,7 @@ export const createIf = (
       }
       return
     }
+    triggered = false
 
     parent ||= anchor.parentNode
     if (block) {
@@ -102,7 +135,7 @@ export const createIf = (
         invokeDirectiveHook(instance, 'unmounted', currentDirs)
       })
     }
-    if ((branch = value ? b1 : b2)) {
+    if ((branch = (oldValue = newValue) ? b1 : b2)) {
       scope = effectScope()
       setDirectivesWithScopeMap(scope, (directives = new Map()))
       fragment.nodes = block = scope.run(branch)!
@@ -122,6 +155,40 @@ export const createIf = (
     } else {
       scope = block = directives = undefined
       fragment.nodes = []
+    }
+  }
+
+  function job() {
+    if (!(effect.flags & EffectFlags.ACTIVE) || !effect.dirty) {
+      return
+    }
+
+    if (instance?.isMounted && !instance.isUpdating) {
+      instance.isUpdating = true
+      const reset = setCurrentInstance(instance)
+
+      const { bu, u, dirs } = instance
+      // beforeUpdate hook
+      if (bu) {
+        invokeArrayFns(bu)
+      }
+      if (dirs) {
+        invokeDirectiveHook(instance, 'beforeUpdate', dirs)
+      }
+
+      queuePostRenderEffect(() => {
+        instance.isUpdating = false
+        const reset = setCurrentInstance(instance)
+        if (dirs) {
+          invokeDirectiveHook(instance, 'updated', dirs)
+        }
+        // updated hook
+        if (u) {
+          queuePostRenderEffect(u)
+        }
+        reset()
+      })
+      reset()
     }
   }
 }
