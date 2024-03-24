@@ -3,6 +3,9 @@ import config from './vitest.config'
 
 export default mergeConfig(config, {
   test: {
-    include: ['packages/vue/__tests__/e2e/*.spec.ts'],
+    include: [
+      'packages/vue/__tests__/e2e/*.spec.ts',
+      'packages/vue-vapor/__tests__/e2e/*.spec.ts',
+    ],
   },
 })
