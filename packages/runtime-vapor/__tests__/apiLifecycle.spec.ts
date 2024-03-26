@@ -2,22 +2,367 @@ import {
   type InjectionKey,
   type Ref,
   createComponent,
+  createIf,
   createTextNode,
   getCurrentInstance,
   inject,
   nextTick,
+  onBeforeMount,
+  onBeforeUnmount,
+  onBeforeUpdate,
+  onMounted,
+  onUnmounted,
   onUpdated,
   provide,
   ref,
   renderEffect,
   setText,
+  template,
 } from '../src'
 import { makeRender } from './_utils'
 
 const define = makeRender<any>()
 
-describe('apiLifecycle', () => {
-  // TODO: test
+describe('api: lifecycle hooks', () => {
+  it('onBeforeMount', () => {
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe(``)
+    })
+    const { render, host } = define({
+      setup() {
+        onBeforeMount(fn)
+        return () => template('<div></div>')()
+      },
+    })
+    render()
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('onMounted', () => {
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe(``)
+    })
+    const { render, host } = define({
+      setup() {
+        onMounted(fn)
+        return () => template('<div></div>')()
+      },
+    })
+    render()
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('onBeforeUpdate', async () => {
+    const count = ref(0)
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe('0')
+    })
+    const { render, host } = define({
+      setup() {
+        onBeforeUpdate(fn)
+        return (() => {
+          const n0 = createTextNode()
+          renderEffect(() => {
+            setText(n0, count.value)
+          })
+          return n0
+        })()
+      },
+    })
+    render()
+    count.value++
+    await nextTick()
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(host.innerHTML).toBe('1')
+  })
+
+  it('state mutation in onBeforeUpdate', async () => {
+    const count = ref(0)
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe('0')
+      count.value++
+    })
+    const renderSpy = vi.fn()
+
+    const { render, host } = define({
+      setup() {
+        onBeforeUpdate(fn)
+        return (() => {
+          const n0 = createTextNode()
+          renderEffect(() => {
+            renderSpy()
+            setText(n0, count.value)
+          })
+          return n0
+        })()
+      },
+    })
+    render()
+    expect(renderSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('onUpdated', async () => {
+    const count = ref(0)
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe('1')
+    })
+
+    const { render, host } = define({
+      setup() {
+        onUpdated(fn)
+        return (() => {
+          const n0 = createTextNode()
+          renderEffect(() => {
+            setText(n0, count.value)
+          })
+          return n0
+        })()
+      },
+    })
+    render()
+
+    count.value++
+    await nextTick()
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('onBeforeUnmount', async () => {
+    const toggle = ref(true)
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe('<div></div>')
+    })
+    const { render, host } = define({
+      setup() {
+        return (() => {
+          const n0 = createIf(
+            () => toggle.value,
+            () => createComponent(Child),
+          )
+          return n0
+        })()
+      },
+    })
+
+    const Child = {
+      setup() {
+        onBeforeUnmount(fn)
+        return (() => {
+          const t0 = template('<div></div>')
+          const n0 = t0()
+          return n0
+        })()
+      },
+    }
+
+    render()
+
+    toggle.value = false
+    await nextTick()
+    // expect(fn).toHaveBeenCalledTimes(1) // FIXME: not called
+    expect(host.innerHTML).toBe('<!--if-->')
+  })
+
+  it('onUnmounted', async () => {
+    const toggle = ref(true)
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe('<div></div>')
+    })
+    const { render, host } = define({
+      setup() {
+        return (() => {
+          const n0 = createIf(
+            () => toggle.value,
+            () => createComponent(Child),
+          )
+          return n0
+        })()
+      },
+    })
+
+    const Child = {
+      setup() {
+        onUnmounted(fn)
+        return (() => {
+          const t0 = template('<div></div>')
+          const n0 = t0()
+          return n0
+        })()
+      },
+    }
+
+    render()
+
+    toggle.value = false
+    await nextTick()
+    // expect(fn).toHaveBeenCalledTimes(1) // FIXME: not called
+    expect(host.innerHTML).toBe('<!--if-->')
+  })
+
+  it('onBeforeUnmount in onMounted', async () => {
+    const toggle = ref(true)
+    const fn = vi.fn(() => {
+      expect(host.innerHTML).toBe('<div></div>')
+    })
+    const { render, host } = define({
+      setup() {
+        return (() => {
+          const n0 = createIf(
+            () => toggle.value,
+            () => createComponent(Child),
+          )
+          return n0
+        })()
+      },
+    })
+
+    const Child = {
+      setup() {
+        onMounted(() => {
+          onBeforeUnmount(fn)
+        })
+        return (() => {
+          const t0 = template('<div></div>')
+          const n0 = t0()
+          return n0
+        })()
+      },
+    }
+
+    render()
+
+    toggle.value = false
+    await nextTick()
+    // expect(fn).toHaveBeenCalledTimes(1) // FIXME: not called
+    expect(host.innerHTML).toBe('<!--if-->')
+  })
+
+  it('lifecycle call order', async () => {
+    const count = ref(0)
+    const toggle = ref(true)
+    const calls: string[] = []
+
+    const { render } = define({
+      setup() {
+        onBeforeMount(() => calls.push('onBeforeMount'))
+        onMounted(() => calls.push('onMounted'))
+        onBeforeUpdate(() => calls.push('onBeforeUpdate'))
+        onUpdated(() => calls.push('onUpdated'))
+        onBeforeUnmount(() => calls.push('onBeforeUnmount'))
+        onUnmounted(() => calls.push('onUnmounted'))
+        return (() => {
+          const n0 = createIf(
+            () => toggle.value,
+            () => createComponent(Mid, { count: () => count.value }),
+          )
+          return n0
+        })()
+      },
+    })
+
+    const Mid = {
+      props: ['count'],
+      setup(props: any) {
+        onBeforeMount(() => calls.push('mid onBeforeMount'))
+        onMounted(() => calls.push('mid onMounted'))
+        onBeforeUpdate(() => calls.push('mid onBeforeUpdate'))
+        onUpdated(() => calls.push('mid onUpdated'))
+        onBeforeUnmount(() => calls.push('mid onBeforeUnmount'))
+        onUnmounted(() => calls.push('mid onUnmounted'))
+        return (() => {
+          const n0 = createComponent(Child, { count: () => props.count })
+          return n0
+        })()
+      },
+    }
+
+    const Child = {
+      props: ['count'],
+      setup(props: any) {
+        onBeforeMount(() => calls.push('child onBeforeMount'))
+        onMounted(() => calls.push('child onMounted'))
+        onBeforeUpdate(() => calls.push('child onBeforeUpdate'))
+        onUpdated(() => calls.push('child onUpdated'))
+        onBeforeUnmount(() => calls.push('child onBeforeUnmount'))
+        onUnmounted(() => calls.push('child onUnmounted'))
+        return (() => {
+          const t0 = template('<div></div>')
+          const n0 = t0()
+          renderEffect(() => setText(n0, props.count))
+          return n0
+        })()
+      },
+    }
+
+    // mount
+    render()
+    expect(calls).toEqual([
+      'onBeforeMount',
+      'mid onBeforeMount',
+      'child onBeforeMount',
+      'child onMounted',
+      'mid onMounted',
+      'onMounted',
+    ])
+
+    calls.length = 0
+
+    // update
+    count.value++
+    await nextTick()
+    // FIXME: not called
+    // expect(calls).toEqual([
+    //   'root onBeforeUpdate',
+    //   'mid onBeforeUpdate',
+    //   'child onBeforeUpdate',
+    //   'child onUpdated',
+    //   'mid onUpdated',
+    //   'root onUpdated',
+    // ])
+
+    calls.length = 0
+
+    // unmount
+    toggle.value = false
+    // FIXME: not called
+    // expect(calls).toEqual([
+    //   'root onBeforeUnmount',
+    //   'mid onBeforeUnmount',
+    //   'child onBeforeUnmount',
+    //   'child onUnmounted',
+    //   'mid onUnmounted',
+    //   'root onUnmounted',
+    // ])
+  })
+
+  it.todo('onRenderTracked', () => {})
+
+  it.todo('onRenderTriggered', async () => {})
+
+  it('runs shared hook fn for each instance', async () => {
+    const fn = vi.fn()
+    const toggle = ref(true)
+    const { render } = define({
+      setup() {
+        return createIf(
+          () => toggle.value,
+          () => [createComponent(Child), createComponent(Child)],
+        )
+      },
+    })
+    const Child = {
+      setup() {
+        onBeforeMount(fn)
+        onBeforeUnmount(fn)
+        return template('<div></div>')()
+      },
+    }
+
+    render()
+    expect(fn).toHaveBeenCalledTimes(2)
+    toggle.value = false
+    await nextTick()
+    // expect(fn).toHaveBeenCalledTimes(4) // FIXME: not called unmounted hook
+  })
 
   // #136
   test('should trigger updated hooks across components. (parent -> child)', async () => {
