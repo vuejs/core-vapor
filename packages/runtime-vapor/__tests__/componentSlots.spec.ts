@@ -2,9 +2,11 @@
 
 import {
   createComponent,
+  createSlot,
   createVaporApp,
   defineComponent,
   getCurrentInstance,
+  insert,
   nextTick,
   ref,
   template,
@@ -56,11 +58,13 @@ describe('component: slots', () => {
         const t0 = template('<div></div>')
         const n0 = t0()
         instance = getCurrentInstance()
+        const n1 = createSlot('header')
+        insert(n1, n0 as any as ParentNode)
         return n0
       },
     })
 
-    const { render } = define({
+    const { render, host } = define({
       render() {
         return createComponent(Comp, {}, { header: () => template('header')() })
       },
@@ -71,6 +75,8 @@ describe('component: slots', () => {
     expect(instance.slots.header()).toMatchObject(
       document.createTextNode('header'),
     )
+
+    expect(host.innerHTML).toBe('<div>header</div>')
   })
 
   // runtime-core's "initSlots: instance.slots should be set correctly (when vnode.shapeFlag is not SLOTS_CHILDREN)"
