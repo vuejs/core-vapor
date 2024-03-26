@@ -8,6 +8,7 @@ import {
   nextTick,
   ref,
   template,
+  withCtx,
 } from '../src'
 import { makeRender } from './_utils'
 
@@ -150,6 +151,35 @@ describe('component: slots', () => {
     // ).toHaveBeenWarned()
 
     expect(instance.slots).toHaveProperty('footer')
+  })
+
+  test('the current instance should be kept in the slot', async () => {
+    let instanceInSlot: any
+
+    const Comp = defineComponent({
+      render() {
+        const instance = getCurrentInstance()
+        instance!.slots.default!()
+        return template('<div></div>')()
+      },
+    })
+
+    const { instance } = define({
+      render() {
+        return createComponent(
+          Comp,
+          {},
+          {
+            default: withCtx(() => {
+              instanceInSlot = getCurrentInstance()
+              return template('content')()
+            }),
+          },
+        )
+      },
+    }).render()
+
+    expect(instanceInSlot).toBe(instance)
   })
 
   test.todo('should respect $stable flag', async () => {
