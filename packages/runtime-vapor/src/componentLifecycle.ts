@@ -23,7 +23,7 @@ export function invokeLifecycle(
       post ? queuePostRenderEffect(fn) : fn()
     }
 
-    invokeDirectiveHook(instance, directive)
+    invokeDirectiveHook(instance, directive, instance.dirs)
   }
 
   function invokeSub() {

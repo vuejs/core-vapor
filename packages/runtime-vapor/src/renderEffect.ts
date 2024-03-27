@@ -1,4 +1,4 @@
-import { EffectFlags, ReactiveEffect, type SchedulerJob } from '@vue/reactivity'
+import { EffectFlags, ReactiveEffect } from '@vue/reactivity'
 import { invokeArrayFns } from '@vue/shared'
 import { getCurrentInstance, setCurrentInstance } from './component'
 import { queueJob, queuePostRenderEffect } from './scheduler'
@@ -7,13 +7,21 @@ import { invokeDirectiveHook } from './directives'
 
 export function renderEffect(cb: () => void) {
   const instance = getCurrentInstance()
+  if (instance) job.id = instance.uid
 
-  let effect: ReactiveEffect
+  const effect = new ReactiveEffect(() => {
+    callWithAsyncErrorHandling(cb, instance, VaporErrorCodes.RENDER_FUNCTION)
+  })
+  effect.scheduler = () => queueJob(job)
 
-  const job: SchedulerJob = () => {
+  effect.run()
+
+  function job() {
     if (!(effect.flags & EffectFlags.ACTIVE) || !effect.dirty) {
       return
     }
+
+    const reset = instance && setCurrentInstance(instance)
 
     if (instance?.isMounted && !instance.isUpdating) {
       instance.isUpdating = true
@@ -24,36 +32,27 @@ export function renderEffect(cb: () => void) {
         invokeArrayFns(bu)
       }
       if (dirs) {
-        invokeDirectiveHook(instance, 'beforeUpdate')
+        invokeDirectiveHook(instance, 'beforeUpdate', dirs)
       }
 
       effect.run()
 
       queuePostRenderEffect(() => {
         instance.isUpdating = false
+        const reset = setCurrentInstance(instance)
         if (dirs) {
-          invokeDirectiveHook(instance, 'updated')
+          invokeDirectiveHook(instance, 'updated', dirs)
         }
         // updated hook
         if (u) {
           queuePostRenderEffect(u)
         }
+        reset()
       })
     } else {
       effect.run()
     }
-  }
 
-  effect = new ReactiveEffect(() => {
-    const reset = instance && setCurrentInstance(instance)
-    callWithAsyncErrorHandling(cb, instance, VaporErrorCodes.RENDER_FUNCTION)
     reset?.()
-  })
-
-  effect.scheduler = () => {
-    if (instance) job.id = instance.uid
-    queueJob(job)
   }
-
-  effect.run()
 }
