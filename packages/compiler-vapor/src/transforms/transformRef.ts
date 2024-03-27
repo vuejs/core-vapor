@@ -11,6 +11,7 @@ import { EMPTY_EXPRESSION } from './utils'
 
 export const transformRef: NodeTransform = (node, context) => {
   if (node.type !== NodeTypes.ELEMENT) return
+
   const dir = findProp(node, 'ref', false, true)
   if (!dir) return
 
@@ -22,10 +23,16 @@ export const transformRef: NodeTransform = (node, context) => {
       ? createSimpleExpression(dir.value.content, true, dir.value.loc)
       : EMPTY_EXPRESSION
   }
+
+  const refFor = context.vFor > 0
+
   return () =>
     context.registerOperation({
       type: IRNodeTypes.SET_REF,
       element: context.reference(),
       value,
+      ref_for: refFor
+        ? createSimpleExpression(String(refFor), false)
+        : undefined,
     })
 }

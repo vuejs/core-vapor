@@ -14,6 +14,7 @@ export function genSetRef(
       vaporHelper('setRef'),
       [`n${oper.element}`],
       genExpression(oper.value, context),
+      oper.ref_for && genExpression(oper.ref_for, context),
     ),
   ]
 }

@@ -1,7 +1,14 @@
 import { type Ref, type SchedulerJob, isRef } from '@vue/reactivity'
 import { currentInstance } from '../component'
 import { VaporErrorCodes, callWithErrorHandling } from '../errorHandling'
-import { EMPTY_OBJ, hasOwn, isFunction, isString } from '@vue/shared'
+import {
+  EMPTY_OBJ,
+  hasOwn,
+  isArray,
+  isFunction,
+  isString,
+  remove,
+} from '@vue/shared'
 import { warn } from '../warning'
 import { queuePostRenderEffect } from '../scheduler'
 
@@ -10,7 +17,7 @@ export type NodeRef = string | Ref | ((ref: Element) => void)
 /**
  * Function for handling a template ref
  */
-export function setRef(el: Element, ref: NodeRef) {
+export function setRef(el: Element, ref: NodeRef, ref_for = false) {
   if (!currentInstance) return
   const { setupState, isUnmounted } = currentInstance
 
@@ -31,7 +38,29 @@ export function setRef(el: Element, ref: NodeRef) {
 
     if (_isString || _isRef) {
       const doSet = () => {
-        if (_isString) {
+        if (ref_for) {
+          const existing = _isString
+            ? hasOwn(setupState, ref)
+              ? setupState[ref]
+              : refs[ref]
+            : ref.value
+          if (isUnmounted) {
+            isArray(existing) && remove(existing, value)
+          } else {
+            if (!isArray(existing)) {
+              if (_isString) {
+                refs[ref] = [value]
+                if (hasOwn(setupState, ref)) {
+                  setupState[ref] = refs[ref]
+                }
+              } else {
+                ref.value = [value]
+              }
+            } else if (!existing.includes(value)) {
+              existing.push(value)
+            }
+          }
+        } else if (_isString) {
           refs[ref] = value
           if (hasOwn(setupState, ref)) {
             setupState[ref] = value
