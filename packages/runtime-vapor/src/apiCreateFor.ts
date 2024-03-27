@@ -60,7 +60,7 @@ export const createFor = (
 
   const instance = getCurrentInstance()
   if (!instance) {
-    warn('createFor() should be called in Vue Component')
+    warn('createFor() can only be used inside setup()')
   }
 
   const directivesList: DirectiveBindingsMap[] = []
