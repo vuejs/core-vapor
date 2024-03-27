@@ -64,9 +64,6 @@ export const createFor = (
   }
 
   const directivesList: DirectiveBindingsMap[] = []
-
-  const update = getMemo ? updateWithMemo : updateWithoutMemo
-
   const effect = new ReactiveEffect(() =>
     callWithErrorHandling(
       () => traverse(src(), 1),
@@ -81,24 +78,17 @@ export const createFor = (
     queueJob(job)
   }
 
-  const relayDirectiveHook = (name: DirectiveHookName) => {
-    for (const dirs of directivesList) {
-      invokeDirectiveHook(instance, name, dirs)
-    }
-  }
-
   const dir: Directive = {
-    beforeUpdate: hook,
-
+    beforeUpdate: run,
     beforeMount: () => {
-      if (instance?.isMounted) return
-      relayDirectiveHook('beforeMount')
+      if (!instance || instance.isMounted) return
+      invokeAllDirective('beforeMount')
       queuePostRenderEffect(() => {
-        relayDirectiveHook('mounted')
+        invokeAllDirective('mounted')
       })
     },
-    beforeUnmount: () => relayDirectiveHook('beforeUnmount'),
-    unmounted: () => relayDirectiveHook('unmounted'),
+    beforeUnmount: () => invokeAllDirective('beforeUnmount'),
+    unmounted: () => invokeAllDirective('unmounted'),
   }
   getDirectivesMap()!.set(parentAnchor, [
     {
@@ -109,7 +99,8 @@ export const createFor = (
     },
   ])
 
-  hook()
+  const update = getMemo ? updateWithMemo : updateWithoutMemo
+  run()
 
   return ref
 
@@ -288,7 +279,7 @@ export const createFor = (
     return null!
   }
 
-  function hook() {
+  function run() {
     if (!isTriggered) {
       for (const dirs of directivesList) {
         invokeDirectiveHook(instance, 'beforeUpdate', dirs)
@@ -478,6 +469,12 @@ export const createFor = (
     }
 
     ref.nodes = [(oldBlocks = newBlocks), parentAnchor]
+  }
+
+  function invokeAllDirective(name: DirectiveHookName) {
+    for (const dirs of directivesList) {
+      invokeDirectiveHook(instance, name, dirs)
+    }
   }
 }
 
