@@ -18,7 +18,7 @@ export function genFor(
   oper: ForIRNode,
   context: CodegenContext,
 ): CodeFragment[] {
-  const { vaporHelper } = context
+  const { vaporHelper, vForGenEffects } = context
   const { source, value, key, index, render, keyProp } = oper
 
   const rawValue = value && value.content
@@ -27,6 +27,8 @@ export function genFor(
 
   const sourceExpr = ['() => (', ...genExpression(source, context), ')']
   let updateFn = '_updateEffect'
+
+  vForGenEffects.push(genEffectInFor)
   context.genEffect = genEffectInFor
 
   const idMap: Record<string, string> = {}
@@ -65,7 +67,8 @@ export function genFor(
     ]
   }
 
-  context.genEffect = undefined
+  vForGenEffects.pop()
+  context.genEffect = vForGenEffects[vForGenEffects.length - 1]
 
   return [
     NEWLINE,
