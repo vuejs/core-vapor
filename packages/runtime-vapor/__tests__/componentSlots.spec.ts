@@ -1,6 +1,7 @@
 // NOTE: This test is implemented based on the case of `runtime-core/__test__/componentSlots.spec.ts`.
 
 import {
+  type ComponentInternalInstance,
   createComponent,
   createForSlots,
   createSlot,
@@ -289,6 +290,47 @@ describe('component: slots', () => {
     loop.value.shift()
     await nextTick()
     expect(instance.slots).not.toHaveProperty('1')
+  })
+
+  test('dynamicSlots should not cover high weight static slots', async () => {
+    const dynamicFlag = ref(true)
+
+    let instance: ComponentInternalInstance
+    const { component: Child } = define({
+      render() {
+        instance = getCurrentInstance()!
+        return [createSlot('default'), createSlot('others')]
+      },
+    })
+
+    const { render, html } = define({
+      render() {
+        return createComponent(Child, {}, [
+          () =>
+            dynamicFlag.value
+              ? { name: 'default', fn: () => template('dynamic default')() }
+              : { name: 'others', fn: () => template('ohters')() },
+          {
+            default: () => template('default')(),
+          },
+        ])
+      },
+    })
+
+    render()
+
+    expect(html()).toBe('default<!--slot--><!--slot-->')
+
+    dynamicFlag.value = false
+    await nextTick()
+
+    expect(html()).toBe('default<!--slot-->others<!--slot-->')
+    expect(instance!.slots).haveOwnProperty('others')
+
+    dynamicFlag.value = true
+    await nextTick()
+    expect(html()).toBe('default<!--slot--><!--slot-->')
+    expect(instance!.slots).not.haveOwnProperty('others')
   })
 
   test.todo('should respect $stable flag', async () => {
