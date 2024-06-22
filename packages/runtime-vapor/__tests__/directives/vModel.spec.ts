@@ -969,22 +969,27 @@ describe('directive: v-model', () => {
     const barValue = { bar: 1 }
 
     const data = ref<Set<string>>(new Set())
-    const { host } = define(() => {
-      const t0 = template('<select><option></option><option></option></select>')
-      const n0 = t0() as HTMLSelectElement
-      const [n1, n2] = Array.from(n0.childNodes) as Array<HTMLOptionElement>
-      setDOMProp(n1, 'value', fooValue)
-      setDOMProp(n2, 'value', barValue)
+    const { host } = define({
+      setup() {
+        const t0 = template(
+          '<select><option></option><option></option></select>',
+        )
+        const n0 = t0() as HTMLSelectElement
+        const [n1, n2] = Array.from(n0.childNodes) as Array<HTMLOptionElement>
+        setDOMProp(n1, 'value', fooValue)
+        setDOMProp(n2, 'value', barValue)
 
-      setDOMProps(n0, [
-        ['value', null],
-        ['multiple', true],
-      ])
-      withDirectives(n0, [
-        [vModelDynamic, () => data.value, '', { number: true }],
-      ])
-      delegate(n0, 'update:modelValue', () => val => (data.value = val))
-      return n0
+        setDOMProps(n0, [
+          ['value', null],
+          ['multiple', true],
+        ])
+        withDirectives(n0, [
+          [vModelDynamic, () => data.value, '', { number: true }],
+        ])
+        delegate(n0, 'update:modelValue', () => val => (data.value = val))
+        return n0
+      },
+      // inheritAttrs: false,
     }).render()
 
     const select = host.querySelector('select') as HTMLSelectElement

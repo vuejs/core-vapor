@@ -46,7 +46,7 @@ describe('patchProp', () => {
       prev = recordPropMetadata(node, 'style', 'color: blue')
       expect(prev).toBe('color: red')
 
-      expect(getMetadata(node)).toEqual([
+      expect(getMetadata(node).slice(0, 2)).toEqual([
         { class: 'bar', style: 'color: blue' },
         {},
       ])
@@ -57,8 +57,8 @@ describe('patchProp', () => {
       const node2 = {} as Node
       recordPropMetadata(node1, 'class', 'foo')
       recordPropMetadata(node2, 'class', 'bar')
-      expect(getMetadata(node1)).toEqual([{ class: 'foo' }, {}])
-      expect(getMetadata(node2)).toEqual([{ class: 'bar' }, {}])
+      expect(getMetadata(node1).slice(0, 2)).toEqual([{ class: 'foo' }, {}])
+      expect(getMetadata(node2).slice(0, 2)).toEqual([{ class: 'bar' }, {}])
     })
   })
 

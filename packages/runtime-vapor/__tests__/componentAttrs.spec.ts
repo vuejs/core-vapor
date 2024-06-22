@@ -1,8 +1,10 @@
 import {
   createComponent,
+  defineComponent,
   getCurrentInstance,
   nextTick,
   ref,
+  renderEffect,
   setText,
   template,
   watchEffect,
@@ -101,17 +103,16 @@ describe('attribute fallthrough', () => {
 
   it('should pass through attrs in nested single root components', async () => {
     const t0 = template('<div>')
-    const { component: Grandson } = define({
+    const Grandson = defineComponent({
       props: ['custom-attr'],
-      render() {
-        const instance = getCurrentInstance()!
+      setup(_, { attrs }) {
         const n0 = t0()
-        watchEffect(() => setText(n0, instance.attrs.foo))
+        renderEffect(() => setText(n0, attrs.foo))
         return n0
       },
     })
 
-    const { component: Child } = define({
+    const Child = defineComponent({
       render() {
         const n0 = createComponent(
           Grandson,

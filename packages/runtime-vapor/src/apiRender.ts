@@ -30,10 +30,7 @@ export type Fragment = {
   [fragmentKey]: true
 }
 
-export function setupComponent(
-  instance: ComponentInternalInstance,
-  singleRoot: boolean = false,
-): void {
+export function setupComponent(instance: ComponentInternalInstance): void {
   if (__DEV__) {
     startMeasure(instance, `init`)
   }
@@ -86,15 +83,12 @@ export function setupComponent(
       resetTracking()
     }
 
-    if (block instanceof DocumentFragment) {
-      block = Array.from(block.childNodes)
-    }
     if (!block) {
       // TODO: warn no template
       block = []
     }
     instance.block = block
-    if (singleRoot) fallThroughAttrs(instance)
+    fallThroughAttrs(instance)
     return block
   })
   reset()

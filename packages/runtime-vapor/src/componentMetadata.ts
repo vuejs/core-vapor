@@ -1,21 +1,26 @@
 import { remove } from '@vue/shared'
 import type { DelegatedHandler } from './dom/event'
 import type { Data } from '@vue/runtime-shared'
+import { type ShallowRef, shallowRef } from '@vue/reactivity'
 
 export enum MetadataKind {
   prop,
   event,
+  internalProps,
+  setDynamicProps,
 }
 
 export type ComponentMetadata = [
   props: Data,
   events: Record<string, DelegatedHandler[]>,
+  internalProps: ShallowRef<Data | undefined>,
+  setDynamicProps?: () => void,
 ]
 
 export function getMetadata(
   el: Node & { $$metadata?: ComponentMetadata },
 ): ComponentMetadata {
-  return el.$$metadata || (el.$$metadata = [{}, {}])
+  return el.$$metadata || (el.$$metadata = [{}, {}, shallowRef()])
 }
 
 export function recordPropMetadata(el: Node, key: string, value: any): any {

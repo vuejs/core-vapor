@@ -3,6 +3,7 @@ import { type ComponentInternalInstance, currentInstance } from './component'
 import { isEmitListener } from './componentEmits'
 import { setDynamicProps } from './dom/prop'
 import type { RawProps } from './componentProps'
+import { MetadataKind, getMetadata } from './componentMetadata'
 import { renderEffect } from './renderEffect'
 
 export function patchAttrs(instance: ComponentInternalInstance) {
@@ -72,6 +73,11 @@ export function fallThroughAttrs(instance: ComponentInternalInstance) {
   if (inheritAttrs === false) return
 
   if (block instanceof Element) {
-    renderEffect(() => setDynamicProps(block, instance.attrs))
+    const metadata = getMetadata(block)
+    if (metadata[MetadataKind.setDynamicProps]) {
+      metadata[MetadataKind.internalProps].value = instance.attrs
+    } else {
+      renderEffect(() => setDynamicProps(block, instance.attrs))
+    }
   }
 }

@@ -132,24 +132,34 @@ export function setDynamicProp(el: Element, key: string, value: any) {
   }
 }
 
-export function setDynamicProps(el: Element, ...args: any) {
-  const oldProps = getMetadata(el)[MetadataKind.prop]
-  const props = args.length > 1 ? mergeProps(...args) : args[0]
+export function setDynamicProps(el: Element, ...args: any[]) {
+  const metadata = getMetadata(el)
+  metadata[MetadataKind.setDynamicProps] = doSet
+  doSet()
 
-  for (const key in oldProps) {
-    // TODO should these keys be allowed as dynamic keys? The current logic of the runtime-core will throw an error
-    if (key === 'textContent' || key === 'innerHTML') {
-      continue
+  function doSet() {
+    const internalDynamicProps = metadata[MetadataKind.internalProps].value
+    if (internalDynamicProps) {
+      args.push(internalDynamicProps)
+    }
+    const props = args.length > 1 ? mergeProps(...args) : args[0]
+
+    const oldProps = metadata[MetadataKind.prop]
+    for (const key in oldProps) {
+      // TODO should these keys be allowed as dynamic keys? The current logic of the runtime-core will throw an error
+      if (key === 'textContent' || key === 'innerHTML') {
+        continue
+      }
+
+      const hasNewValue = props[key] || props['.' + key] || props['^' + key]
+      if (oldProps[key] && !hasNewValue) {
+        setDynamicProp(el, key, null)
+      }
     }
 
-    const hasNewValue = props[key] || props['.' + key] || props['^' + key]
-    if (oldProps[key] && !hasNewValue) {
-      setDynamicProp(el, key, null)
+    for (const key in props) {
+      setDynamicProp(el, key, props[key])
     }
-  }
-
-  for (const key in props) {
-    setDynamicProp(el, key, props[key])
   }
 }
 
