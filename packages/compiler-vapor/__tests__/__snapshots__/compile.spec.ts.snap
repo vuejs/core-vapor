@@ -11,6 +11,16 @@ export function render(_ctx) {
 }"
 `;
 
+exports[`compile > close tag 1`] = `
+"import { template as _template } from 'vue/vapor';
+const t0 = _template("<div><span><div /></span></div>")
+
+export function render(_ctx) {
+  const n0 = t0()
+  return n0
+}"
+`;
+
 exports[`compile > custom directive > basic 1`] = `
 "import { resolveDirective as _resolveDirective, withDirectives as _withDirectives, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
@@ -230,6 +240,26 @@ export function render(_ctx) {
 exports[`compile > static template 1`] = `
 "import { template as _template } from 'vue/vapor';
 const t0 = _template("<div><p>hello</p><input><span></span></div>")
+
+export function render(_ctx) {
+  const n0 = t0()
+  return n0
+}"
+`;
+
+exports[`compile > two close tag  1`] = `
+"import { template as _template } from 'vue/vapor';
+const t0 = _template("<div><span /><span /></div>")
+
+export function render(_ctx) {
+  const n0 = t0()
+  return n0
+}"
+`;
+
+exports[`compile > two close tag with text 1`] = `
+"import { template as _template } from 'vue/vapor';
+const t0 = _template("<div><span>ddd</span><span /></div>")
 
 export function render(_ctx) {
   const n0 = t0()

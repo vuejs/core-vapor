@@ -151,7 +151,7 @@ const tokenizer = new Tokenizer(stack, {
     endOpenTag(end)
   },
 
-  onclosetag(start, end) {
+  onclosetag(start, end, isLastElement) {
     const name = getSlice(start, end)
     if (!currentOptions.isVoidTag(name)) {
       let found = false
@@ -159,6 +159,9 @@ const tokenizer = new Tokenizer(stack, {
         const e = stack[i]
         if (e.tag.toLowerCase() === name.toLowerCase()) {
           found = true
+          if (isLastElement) {
+            e.isShouldSelfClosing = true
+          }
           if (i > 0) {
             emitError(ErrorCodes.X_MISSING_END_TAG, stack[0].loc.start.offset)
           }

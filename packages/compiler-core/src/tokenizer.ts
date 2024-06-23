@@ -186,7 +186,7 @@ export interface Callbacks {
   onopentagname(start: number, endIndex: number): void
   onopentagend(endIndex: number): void
   onselfclosingtag(endIndex: number): void
-  onclosetag(start: number, endIndex: number): void
+  onclosetag(start: number, endIndex: number, isLastElement: boolean): void
 
   onattribdata(start: number, endIndex: number): void
   onattribentity(char: string, start: number, end: number): void
@@ -246,6 +246,8 @@ export default class Tokenizer {
   public inVPre = false
   /** Record newline positions for fast line / column calculation */
   private newlines: number[] = []
+  // Record current stage
+  private currentStage = ''
 
   private readonly entityDecoder?: EntityDecoder
 
@@ -311,6 +313,7 @@ export default class Tokenizer {
     if (c === CharCodes.Lt) {
       if (this.index > this.sectionStart) {
         this.cbs.ontext(this.sectionStart, this.index)
+        this.currentStage = 'stateText'
       }
       this.state = State.BeforeTagName
       this.sectionStart = this.index
@@ -608,8 +611,13 @@ export default class Tokenizer {
   }
   private stateInClosingTagName(c: number): void {
     if (c === CharCodes.Gt || isWhitespace(c)) {
-      this.cbs.onclosetag(this.sectionStart, this.index)
+      this.cbs.onclosetag(
+        this.sectionStart,
+        this.index,
+        this.currentStage === 'stateInTagName',
+      )
       this.sectionStart = -1
+      this.currentStage = 'InClosingTagName'
       this.state = State.AfterClosingTagName
       this.stateAfterClosingTagName(c)
     }
@@ -619,6 +627,7 @@ export default class Tokenizer {
     if (c === CharCodes.Gt) {
       this.state = State.Text
       this.sectionStart = this.index + 1
+      this.currentStage = 'stateAfterClosingTagName'
     }
   }
   private stateBeforeAttrName(c: number): void {
@@ -927,78 +936,97 @@ export default class Tokenizer {
       switch (this.state) {
         case State.Text: {
           this.stateText(c)
+
           break
         }
         case State.InterpolationOpen: {
           this.stateInterpolationOpen(c)
+          this.currentStage = 'stateInterpolationOpen'
           break
         }
         case State.Interpolation: {
           this.stateInterpolation(c)
+          this.currentStage = 'stateInterpolation'
           break
         }
         case State.InterpolationClose: {
           this.stateInterpolationClose(c)
+          this.currentStage = 'stateInterpolationClose'
           break
         }
         case State.SpecialStartSequence: {
           this.stateSpecialStartSequence(c)
+          this.currentStage = 'stateSpecialStartSequence'
           break
         }
         case State.InRCDATA: {
           this.stateInRCDATA(c)
+          this.currentStage = 'stateInRCDATA'
           break
         }
         case State.CDATASequence: {
           this.stateCDATASequence(c)
+          this.currentStage = 'stateCDATASequence'
           break
         }
         case State.InAttrValueDq: {
           this.stateInAttrValueDoubleQuotes(c)
+          this.currentStage = 'stateInAttrValueDoubleQuotes'
           break
         }
         case State.InAttrName: {
           this.stateInAttrName(c)
+          this.currentStage = 'stateInAttrName'
           break
         }
         case State.InDirName: {
           this.stateInDirName(c)
+          this.currentStage = 'stateInDirName'
           break
         }
         case State.InDirArg: {
           this.stateInDirArg(c)
+          this.currentStage = 'stateInDirArg'
           break
         }
         case State.InDirDynamicArg: {
           this.stateInDynamicDirArg(c)
+          this.currentStage = 'stateInDynamicDirArg'
           break
         }
         case State.InDirModifier: {
           this.stateInDirModifier(c)
+          this.currentStage = 'stateInDirModifier'
           break
         }
         case State.InCommentLike: {
           this.stateInCommentLike(c)
+          this.currentStage = 'stateInCommentLike'
           break
         }
         case State.InSpecialComment: {
           this.stateInSpecialComment(c)
+          this.currentStage = 'stateInSpecialComment'
           break
         }
         case State.BeforeAttrName: {
           this.stateBeforeAttrName(c)
+          this.currentStage = 'stateBeforeAttrName'
           break
         }
         case State.InTagName: {
           this.stateInTagName(c)
+          this.currentStage = 'stateInTagName'
           break
         }
         case State.InSFCRootTagName: {
           this.stateInSFCRootTagName(c)
+          this.currentStage = 'stateInSFCRootTagName'
           break
         }
         case State.InClosingTagName: {
           this.stateInClosingTagName(c)
+
           break
         }
         case State.BeforeTagName: {
@@ -1007,14 +1035,17 @@ export default class Tokenizer {
         }
         case State.AfterAttrName: {
           this.stateAfterAttrName(c)
+          this.currentStage = 'stateAfterAttrName'
           break
         }
         case State.InAttrValueSq: {
           this.stateInAttrValueSingleQuotes(c)
+          this.currentStage = 'stateInAttrValueSingleQuotes'
           break
         }
         case State.BeforeAttrValue: {
           this.stateBeforeAttrValue(c)
+          this.currentStage = 'stateBeforeAttrValue'
           break
         }
         case State.BeforeClosingTagName: {
@@ -1023,42 +1054,52 @@ export default class Tokenizer {
         }
         case State.AfterClosingTagName: {
           this.stateAfterClosingTagName(c)
+
           break
         }
         case State.BeforeSpecialS: {
           this.stateBeforeSpecialS(c)
+          this.currentStage = 'stateBeforeSpecialS'
           break
         }
         case State.BeforeSpecialT: {
           this.stateBeforeSpecialT(c)
+          this.currentStage = 'stateBeforeSpecialT'
           break
         }
         case State.InAttrValueNq: {
           this.stateInAttrValueNoQuotes(c)
+          this.currentStage = 'stateInAttrValueNoQuotes'
           break
         }
         case State.InSelfClosingTag: {
           this.stateInSelfClosingTag(c)
+          this.currentStage = 'stateInSelfClosingTag'
           break
         }
         case State.InDeclaration: {
           this.stateInDeclaration(c)
+          this.currentStage = 'stateInDeclaration'
           break
         }
         case State.BeforeDeclaration: {
           this.stateBeforeDeclaration(c)
+          this.currentStage = 'stateBeforeDeclaration'
           break
         }
         case State.BeforeComment: {
           this.stateBeforeComment(c)
+          this.currentStage = 'stateBeforeComment'
           break
         }
         case State.InProcessingInstruction: {
           this.stateInProcessingInstruction(c)
+          this.currentStage = 'stateInProcessingInstruction'
           break
         }
         case State.InEntity: {
           this.stateInEntity()
+          this.currentStage = 'stateInEntity'
           break
         }
       }
