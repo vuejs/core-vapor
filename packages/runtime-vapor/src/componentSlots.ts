@@ -52,7 +52,7 @@ export function initSlots(
 
   instance.slots = shallowReactive({})
   const renderedSlotKeys: Set<string>[] = []
-  const slotNameLevels: Record<string, [number, Slot][]> = {}
+  const slotsQueue: Record<string, [number, Slot][]> = {}
   rawSlots.forEach((slots, index) => {
     const isDynamicSlot = isDynamicSlotFn(slots)
     if (isDynamicSlot) {
@@ -61,7 +61,7 @@ export function initSlots(
           renderedSlotKeys[index] || (renderedSlotKeys[index] = new Set())
         let dynamicSlot: ReturnType<DynamicSlotFn>
         dynamicSlot = slots()
-        const restoreKeys = cleanupSlot(index)
+        const restoreSlotNames = cleanupSlot(index)
         if (isArray(dynamicSlot)) {
           for (const slot of dynamicSlot) {
             registerSlot(slot.name, slot.fn, index, renderedKeys)
@@ -69,9 +69,12 @@ export function initSlots(
         } else if (dynamicSlot) {
           registerSlot(dynamicSlot.name, dynamicSlot.fn, index, renderedKeys)
         }
-        if (restoreKeys.length) {
-          for (const key of restoreKeys) {
-            resolveSlot(key, slotNameLevels[key][0][1])
+        if (restoreSlotNames.length) {
+          for (const key of restoreSlotNames) {
+            const [restoreLevel, restoreFn] = slotsQueue[key][0]
+            renderedSlotKeys[restoreLevel] &&
+              renderedSlotKeys[restoreLevel].add(key)
+            resolveSlot(key, restoreFn)
           }
         }
         for (const name of renderedKeys) {
@@ -93,22 +96,22 @@ export function initSlots(
   })
 
   function cleanupSlot(level: number) {
-    const restoreKeys: string[] = []
-    Object.keys(slotNameLevels).forEach(key => {
-      const index = slotNameLevels[key].findIndex(([l]) => l === level)
+    const restoreSlotNames: string[] = []
+    Object.keys(slotsQueue).forEach(slotName => {
+      const index = slotsQueue[slotName].findIndex(([l]) => l === level)
       if (index > -1) {
-        slotNameLevels[key].splice(index, 1)
-        if (!slotNameLevels[key].length) {
-          delete slotNameLevels[key]
+        slotsQueue[slotName].splice(index, 1)
+        if (!slotsQueue[slotName].length) {
+          delete slotsQueue[slotName]
           return
         }
         if (index === 0) {
-          renderedSlotKeys[level] && renderedSlotKeys[level].delete(key)
-          restoreKeys.push(key)
+          renderedSlotKeys[level] && renderedSlotKeys[level].delete(slotName)
+          restoreSlotNames.push(slotName)
         }
       }
     })
-    return restoreKeys
+    return restoreSlotNames
   }
 
   function registerSlot(
@@ -117,17 +120,17 @@ export function initSlots(
     level: number,
     renderedKeys?: Set<string>,
   ) {
-    slotNameLevels[name] = slotNameLevels[name] || []
-    slotNameLevels[name].push([level, fn])
-    slotNameLevels[name].sort((a, b) => b[0] - a[0])
-    for (let i = 1; i < slotNameLevels[name].length; i++) {
-      const hidenLevel = slotNameLevels[name][i][0]
+    slotsQueue[name] = slotsQueue[name] || []
+    slotsQueue[name].push([level, fn])
+    slotsQueue[name].sort((a, b) => b[0] - a[0])
+    if (slotsQueue[name][1]) {
+      const hidenLevel = slotsQueue[name][1][0]
       renderedSlotKeys[hidenLevel] && renderedSlotKeys[hidenLevel].delete(name)
     }
-    if (slotNameLevels[name][0][0] === level) {
+    if (slotsQueue[name][0][0] === level) {
       renderedKeys && renderedKeys.add(name)
     }
-    resolveSlot(name, slotNameLevels[name][0][1])
+    resolveSlot(name, slotsQueue[name][0][1])
   }
 
   function resolveSlot(name: string, fn: Slot) {
