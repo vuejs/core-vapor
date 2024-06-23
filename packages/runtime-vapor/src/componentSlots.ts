@@ -45,22 +45,20 @@ export function initSlots(
     // with ctx
     const slots = rawSlots[0] as StaticSlots
     for (const name in slots) {
-      resolveSlot(name, slots[name])
+      addSlot(name, slots[name])
     }
     return
   }
 
   instance.slots = shallowReactive({})
   const renderedSlotKeys: Set<string>[] = []
-  const slotsQueue: Record<string, [number, Slot][]> = {}
+  const slotsQueue: Record<string, [level: number, slot: Slot][]> = {}
   rawSlots.forEach((slots, index) => {
     const isDynamicSlot = isDynamicSlotFn(slots)
     if (isDynamicSlot) {
       firstEffect(instance, () => {
-        const renderedKeys =
-          renderedSlotKeys[index] || (renderedSlotKeys[index] = new Set())
-        let dynamicSlot: ReturnType<DynamicSlotFn>
-        dynamicSlot = slots()
+        const renderedKeys = (renderedSlotKeys[index] ||= new Set())
+        let dynamicSlot = slots()
         const restoreSlotNames = cleanupSlot(index)
         if (isArray(dynamicSlot)) {
           for (const slot of dynamicSlot) {
@@ -74,7 +72,7 @@ export function initSlots(
             const [restoreLevel, restoreFn] = slotsQueue[key][0]
             renderedSlotKeys[restoreLevel] &&
               renderedSlotKeys[restoreLevel].add(key)
-            resolveSlot(key, restoreFn)
+            addSlot(key, restoreFn)
           }
         }
         for (const name of renderedKeys) {
@@ -116,12 +114,12 @@ export function initSlots(
 
   function registerSlot(
     name: string,
-    fn: Slot,
+    slot: Slot,
     level: number,
     renderedKeys?: Set<string>,
   ) {
-    slotsQueue[name] = slotsQueue[name] || []
-    slotsQueue[name].push([level, fn])
+    slotsQueue[name] ||= []
+    slotsQueue[name].push([level, slot])
     slotsQueue[name].sort((a, b) => b[0] - a[0])
     if (slotsQueue[name][1]) {
       const hidenLevel = slotsQueue[name][1][0]
@@ -130,10 +128,10 @@ export function initSlots(
     if (slotsQueue[name][0][0] === level) {
       renderedKeys && renderedKeys.add(name)
     }
-    resolveSlot(name, slotsQueue[name][0][1])
+    addSlot(name, slotsQueue[name][0][1])
   }
 
-  function resolveSlot(name: string, fn: Slot) {
+  function addSlot(name: string, fn: Slot) {
     instance.slots[name] = withCtx(fn)
   }
 
