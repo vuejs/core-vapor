@@ -3,6 +3,7 @@
 import {
   type ComponentInternalInstance,
   createComponent,
+  createFor,
   createForSlots,
   createSlot,
   createVaporApp,
@@ -15,6 +16,7 @@ import {
   renderEffect,
   setText,
   template,
+  useSlots,
   withDestructure,
 } from '../src'
 import { makeRender } from './_utils'
@@ -326,7 +328,71 @@ describe('component: slots', () => {
     expect(instance.slots).not.toHaveProperty('1')
   })
 
-  test('dynamicSlots should not cover high weight static slots', async () => {
+  test('should not delete new rendered slot when the old slot is removed in loop slot', async () => {
+    const loop = ref([1, 'default', 3])
+
+    let childInstance
+    const t0 = template('<div></div>')
+    const { component: Child } = define({
+      setup() {
+        childInstance = getCurrentInstance()
+        const slots = useSlots()
+        const keys = () => Object.keys(slots)
+        return {
+          keys,
+          slots,
+        }
+      },
+      render: (_ctx: any) => {
+        const n0 = createFor(
+          () => _ctx.keys(),
+          (_ctx0: any) => {
+            const n5 = t0()
+            const n4 = createSlot(() => _ctx0[0])
+            insert(n4, n5 as ParentNode)
+            return n5
+          },
+        )
+        return n0
+      },
+    })
+
+    const t1 = template(' static default ')
+    const { render } = define({
+      setup() {
+        return createComponent(Child, {}, [
+          {
+            default: () => {
+              return t1()
+            },
+          },
+          () =>
+            createForSlots(loop.value, (item, i) => ({
+              name: item,
+              fn: () => template(item)(),
+            })),
+        ])
+      },
+    })
+    const { html } = render()
+
+    expect(childInstance!.slots).toHaveProperty('1')
+    expect(childInstance!.slots).toHaveProperty('default')
+    expect(childInstance!.slots).toHaveProperty('3')
+    expect(html()).toBe(
+      '<div>1<!--slot--></div><div>3<!--slot--></div><div>default<!--slot--></div><!--for-->',
+    )
+    loop.value = [1]
+    await nextTick()
+    expect(childInstance!.slots).toHaveProperty('1')
+    expect(childInstance!.slots).toHaveProperty('default')
+    expect(childInstance!.slots).not.toHaveProperty('3')
+    expect(html()).toBe(
+      '<div>1<!--slot--></div><div> static default <!--slot--></div><!--for-->',
+    )
+  })
+
+  test('dynamicSlots should not cover high level slots', async () => {
     const dynamicFlag = ref(true)
 
     let instance: ComponentInternalInstance
@@ -343,7 +409,7 @@ describe('component: slots', () => {
           () =>
             dynamicFlag.value
               ? { name: 'default', fn: () => template('dynamic default')() }
-              : { name: 'others', fn: () => template('ohters')() },
+              : { name: 'others', fn: () => template('others')() },
           {
             default: () => template('default')(),
           },

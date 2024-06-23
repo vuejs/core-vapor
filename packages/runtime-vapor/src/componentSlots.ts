@@ -45,51 +45,93 @@ export function initSlots(
     // with ctx
     const slots = rawSlots[0] as StaticSlots
     for (const name in slots) {
-      registerSlot(name, slots[name])
+      resolveSlot(name, slots[name])
     }
     return
   }
 
   instance.slots = shallowReactive({})
-  const keys: Set<string>[] = []
+  const renderedSlotKeys: Set<string>[] = []
+  const slotNameLevels: Record<string, [number, Slot][]> = {}
   rawSlots.forEach((slots, index) => {
     const isDynamicSlot = isDynamicSlotFn(slots)
     if (isDynamicSlot) {
       firstEffect(instance, () => {
-        const recordNames = keys[index] || (keys[index] = new Set())
+        const renderedKeys =
+          renderedSlotKeys[index] || (renderedSlotKeys[index] = new Set())
         let dynamicSlot: ReturnType<DynamicSlotFn>
-        if (isDynamicSlotFn(slots)) {
-          dynamicSlot = slots()
-          if (isArray(dynamicSlot)) {
-            for (const slot of dynamicSlot) {
-              registerSlot(slot.name, slot.fn, recordNames)
-            }
-          } else if (dynamicSlot) {
-            registerSlot(dynamicSlot.name, dynamicSlot.fn, recordNames)
+        dynamicSlot = slots()
+        const restoreKeys = cleanupSlot(index)
+        if (isArray(dynamicSlot)) {
+          for (const slot of dynamicSlot) {
+            registerSlot(slot.name, slot.fn, index, renderedKeys)
           }
-        } else {
+        } else if (dynamicSlot) {
+          registerSlot(dynamicSlot.name, dynamicSlot.fn, index, renderedKeys)
         }
-        for (const name of recordNames) {
+        if (restoreKeys.length) {
+          for (const key of restoreKeys) {
+            resolveSlot(key, slotNameLevels[key][0][1])
+          }
+        }
+        for (const name of renderedKeys) {
           if (
             !(isArray(dynamicSlot)
               ? dynamicSlot.some(s => s.name === name)
               : dynamicSlot && dynamicSlot.name === name)
           ) {
-            recordNames.delete(name)
+            renderedKeys.delete(name)
             delete instance.slots[name]
           }
         }
       })
     } else {
       for (const name in slots) {
-        registerSlot(name, slots[name])
+        registerSlot(name, slots[name], index)
       }
     }
   })
 
-  function registerSlot(name: string, fn: Slot, recordNames?: Set<string>) {
+  function cleanupSlot(level: number) {
+    const restoreKeys: string[] = []
+    Object.keys(slotNameLevels).forEach(key => {
+      const index = slotNameLevels[key].findIndex(([l]) => l === level)
+      if (index > -1) {
+        slotNameLevels[key].splice(index, 1)
+        if (!slotNameLevels[key].length) {
+          delete slotNameLevels[key]
+          return
+        }
+        if (index === 0) {
+          renderedSlotKeys[level] && renderedSlotKeys[level].delete(key)
+          restoreKeys.push(key)
+        }
+      }
+    })
+    return restoreKeys
+  }
+
+  function registerSlot(
+    name: string,
+    fn: Slot,
+    level: number,
+    renderedKeys?: Set<string>,
+  ) {
+    slotNameLevels[name] = slotNameLevels[name] || []
+    slotNameLevels[name].push([level, fn])
+    slotNameLevels[name].sort((a, b) => b[0] - a[0])
+    for (let i = 1; i < slotNameLevels[name].length; i++) {
+      const hidenLevel = slotNameLevels[name][i][0]
+      renderedSlotKeys[hidenLevel] && renderedSlotKeys[hidenLevel].delete(name)
+    }
+    if (slotNameLevels[name][0][0] === level) {
+      renderedKeys && renderedKeys.add(name)
+    }
+    resolveSlot(name, slotNameLevels[name][0][1])
+  }
+
+  function resolveSlot(name: string, fn: Slot) {
     instance.slots[name] = withCtx(fn)
-    recordNames && recordNames.add(name)
   }
 
   function withCtx(fn: Slot): Slot {
