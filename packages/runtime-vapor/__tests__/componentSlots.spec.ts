@@ -392,6 +392,76 @@ describe('component: slots', () => {
     )
   })
 
+  test('should cleanup all slots when loop slot has same key', async () => {
+    const loop = ref([1, 1, 1])
+
+    let childInstance
+    const t0 = template('<div></div>')
+    const { component: Child } = define({
+      setup() {
+        childInstance = getCurrentInstance()
+        const slots = useSlots()
+        const keys = () => Object.keys(slots)
+        return {
+          keys,
+          slots,
+        }
+      },
+      render: (_ctx: any) => {
+        const n0 = createFor(
+          () => _ctx.keys(),
+          (_ctx0: any) => {
+            const n5 = t0()
+            const n4 = createSlot(() => _ctx0[0])
+            insert(n4, n5 as ParentNode)
+            return n5
+          },
+        )
+        return n0
+      },
+    })
+
+    const t1 = template(' static default ')
+    const { render } = define({
+      setup() {
+        return createComponent(Child, {}, [
+          {
+            default: () => {
+              return t1()
+            },
+          },
+          () =>
+            createForSlots(loop.value, (item, i) => ({
+              name: item,
+              fn: () => template(item)(),
+            })),
+        ])
+      },
+    })
+    const { html } = render()
+    expect(childInstance!.slots).toHaveProperty('1')
+    expect(childInstance!.slots).toHaveProperty('default')
+    expect(html()).toBe(
+      '<div>1<!--slot--></div><div> static default <!--slot--></div><!--for-->',
+    )
+    loop.value = [1]
+    await nextTick()
+    expect(childInstance!.slots).toHaveProperty('1')
+    expect(childInstance!.slots).toHaveProperty('default')
+    expect(html()).toBe(
+      '<div>1<!--slot--></div><div> static default <!--slot--></div><!--for-->',
+    )
+    loop.value = [1, 2, 3]
+    await nextTick()
+    expect(childInstance!.slots).toHaveProperty('1')
+    expect(childInstance!.slots).toHaveProperty('2')
+    expect(childInstance!.slots).toHaveProperty('3')
+    expect(childInstance!.slots).toHaveProperty('default')
+    expect(html()).toBe(
+      '<div>1<!--slot--></div><div>2<!--slot--></div><div>3<!--slot--></div><div> static default <!--slot--></div><!--for-->',
+    )
+  })
+
   test('dynamicSlots should not cover high level slots', async () => {
     const dynamicFlag = ref(true)
 

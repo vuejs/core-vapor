@@ -52,6 +52,10 @@ export function initSlots(
 
   instance.slots = shallowReactive({})
   const renderedSlotKeys: Set<string>[] = []
+  /**
+   * Maintain a queue for each slot name, so that we can
+   * render the next slot when the highest level slot was removed
+   */
   const slotsQueue: Record<string, [level: number, slot: Slot][]> = {}
   rawSlots.forEach((slots, index) => {
     const isDynamicSlot = isDynamicSlotFn(slots)
@@ -59,6 +63,8 @@ export function initSlots(
       firstEffect(instance, () => {
         const renderedKeys = (renderedSlotKeys[index] ||= new Set())
         let dynamicSlot = slots()
+        // cleanup slots and re-calc to avoid diffing slots between renders
+        // cleanup will return a slotNames array contains the slot names that need to be restored
         const restoreSlotNames = cleanupSlot(index)
         if (isArray(dynamicSlot)) {
           for (const slot of dynamicSlot) {
@@ -67,6 +73,7 @@ export function initSlots(
         } else if (dynamicSlot) {
           registerSlot(dynamicSlot.name, dynamicSlot.fn, index, renderedKeys)
         }
+        // restore after re-calc slots
         if (restoreSlotNames.length) {
           for (const key of restoreSlotNames) {
             const [restoreLevel, restoreFn] = slotsQueue[key][0]
@@ -75,6 +82,7 @@ export function initSlots(
             addSlot(key, restoreFn)
           }
         }
+        // delete stale slots
         for (const name of renderedKeys) {
           if (
             !(isArray(dynamicSlot)
@@ -95,14 +103,16 @@ export function initSlots(
 
   function cleanupSlot(level: number) {
     const restoreSlotNames: string[] = []
+    // remove slots from all queues
     Object.keys(slotsQueue).forEach(slotName => {
       const index = slotsQueue[slotName].findIndex(([l]) => l === level)
       if (index > -1) {
-        slotsQueue[slotName].splice(index, 1)
+        slotsQueue[slotName] = slotsQueue[slotName].filter(([l]) => l !== level)
         if (!slotsQueue[slotName].length) {
           delete slotsQueue[slotName]
           return
         }
+        // restore next slot if the removed slots was the highest level slot
         if (index === 0) {
           renderedSlotKeys[level] && renderedSlotKeys[level].delete(slotName)
           restoreSlotNames.push(slotName)
@@ -121,6 +131,7 @@ export function initSlots(
     slotsQueue[name] ||= []
     slotsQueue[name].push([level, slot])
     slotsQueue[name].sort((a, b) => b[0] - a[0])
+    // hide old slot if the registered slot is the highest level
     if (slotsQueue[name][1]) {
       const hidenLevel = slotsQueue[name][1][0]
       renderedSlotKeys[hidenLevel] && renderedSlotKeys[hidenLevel].delete(name)
@@ -128,6 +139,7 @@ export function initSlots(
     if (slotsQueue[name][0][0] === level) {
       renderedKeys && renderedKeys.add(name)
     }
+    // render the highest level slot
     addSlot(name, slotsQueue[name][0][1])
   }
 
