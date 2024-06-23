@@ -204,6 +204,52 @@ exports[`compile > expression parsing > v-bind 1`] = `
 })()"
 `;
 
+exports[`compile > expression parsing > v-for 1`] = `
+"(() => {
+  const n0 = _createFor(() => (lists), (_ctx0) => {
+    const n5 = t0()
+    const n2 = _createFor(() => (_ctx0[0].children), (_ctx1) => {
+      const n4 = t0()
+      _renderEffect(() => _setText(n4, _ctx1[0]))
+      return n4
+    })
+    _insert(n2, n5)
+    return n5
+  })
+  return n0
+})()"
+`;
+
+exports[`compile > expression parsing > v-on 1`] = `
+"(() => {
+  const n0 = t0()
+  _delegate(n0, "click", () => e => fn(e,'str',...args))
+  return n0
+})()"
+`;
+
+exports[`compile > expression parsing > v-slot 1`] = `
+"(() => {
+  const _component_Comp = _resolveComponent("Comp")
+  const n6 = t1()
+  const n0 = _createTextNode(() => [a as Foo, " ", b<Bar>(), " ", Baz, " "])
+  const n2 = _createComponent(_component_Comp, null, [
+    {
+      default: _withDestructure(({ data }: Qux) => [data], (_ctx0) => {
+        const n1 = _createTextNode(() => [_ctx0[0]])
+        return n1
+      })
+    }
+  ])
+  const n3 = _createFor(() => (list as Fred), _withDestructure(([{ z = x as Qux }]) => [z], (_ctx0) => {
+    const n5 = t0()
+    return n5
+  }))
+  _insert([n0, n2, n3], n6)
+  return n6
+})()"
+`;
+
 exports[`compile > fragment 1`] = `
 "import { template as _template } from 'vue/vapor';
 const t0 = _template("<p></p>")
