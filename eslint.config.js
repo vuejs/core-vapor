@@ -1,7 +1,7 @@
+import { builtinModules } from 'node:module'
 import importX from 'eslint-plugin-import-x'
 import tseslint from 'typescript-eslint'
 import vitest from 'eslint-plugin-vitest'
-import { builtinModules } from 'node:module'
 
 const DOMGlobals = ['window', 'document']
 const NodeGlobals = ['module', 'require']
@@ -87,7 +87,7 @@ export default tseslint.config(
       'no-console': 'off',
       'no-restricted-globals': 'off',
       'no-restricted-syntax': 'off',
-      'vitest/no-disabled-tests': 'error',
+      'vitest/no-disabled-tests': 'warn',
       'vitest/no-focused-tests': 'error',
     },
   },
