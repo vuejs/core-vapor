@@ -45,51 +45,106 @@ export function initSlots(
     // with ctx
     const slots = rawSlots[0] as StaticSlots
     for (const name in slots) {
-      registerSlot(name, slots[name])
+      addSlot(name, slots[name])
     }
     return
   }
 
   instance.slots = shallowReactive({})
-  const keys: Set<string>[] = []
+  const renderedSlotKeys: Set<string>[] = []
+  /**
+   * Maintain a queue for each slot name, so that we can
+   * render the next slot when the highest level slot was removed
+   */
+  const slotsQueue: Record<string, [level: number, slot: Slot][]> = {}
   rawSlots.forEach((slots, index) => {
     const isDynamicSlot = isDynamicSlotFn(slots)
     if (isDynamicSlot) {
       firstEffect(instance, () => {
-        const recordNames = keys[index] || (keys[index] = new Set())
-        let dynamicSlot: ReturnType<DynamicSlotFn>
-        if (isDynamicSlotFn(slots)) {
-          dynamicSlot = slots()
-          if (isArray(dynamicSlot)) {
-            for (const slot of dynamicSlot) {
-              registerSlot(slot.name, slot.fn, recordNames)
-            }
-          } else if (dynamicSlot) {
-            registerSlot(dynamicSlot.name, dynamicSlot.fn, recordNames)
+        const renderedKeys = (renderedSlotKeys[index] ||= new Set())
+        let dynamicSlot = slots()
+        // cleanup slots and re-calc to avoid diffing slots between renders
+        // cleanup will return a slotNames array contains the slot names that need to be restored
+        const restoreSlotNames = cleanupSlot(index)
+        if (isArray(dynamicSlot)) {
+          for (const slot of dynamicSlot) {
+            registerSlot(slot.name, slot.fn, index, renderedKeys)
           }
-        } else {
+        } else if (dynamicSlot) {
+          registerSlot(dynamicSlot.name, dynamicSlot.fn, index, renderedKeys)
         }
-        for (const name of recordNames) {
+        // restore after re-calc slots
+        if (restoreSlotNames.length) {
+          for (const key of restoreSlotNames) {
+            const [restoreLevel, restoreFn] = slotsQueue[key][0]
+            renderedSlotKeys[restoreLevel] &&
+              renderedSlotKeys[restoreLevel].add(key)
+            addSlot(key, restoreFn)
+          }
+        }
+        // delete stale slots
+        for (const name of renderedKeys) {
           if (
             !(isArray(dynamicSlot)
               ? dynamicSlot.some(s => s.name === name)
               : dynamicSlot && dynamicSlot.name === name)
           ) {
-            recordNames.delete(name)
+            renderedKeys.delete(name)
             delete instance.slots[name]
           }
         }
       })
     } else {
       for (const name in slots) {
-        registerSlot(name, slots[name])
+        registerSlot(name, slots[name], index)
       }
     }
   })
 
-  function registerSlot(name: string, fn: Slot, recordNames?: Set<string>) {
+  function cleanupSlot(level: number) {
+    const restoreSlotNames: string[] = []
+    // remove slots from all queues
+    Object.keys(slotsQueue).forEach(slotName => {
+      const index = slotsQueue[slotName].findIndex(([l]) => l === level)
+      if (index > -1) {
+        slotsQueue[slotName] = slotsQueue[slotName].filter(([l]) => l !== level)
+        if (!slotsQueue[slotName].length) {
+          delete slotsQueue[slotName]
+          return
+        }
+        // restore next slot if the removed slots was the highest level slot
+        if (index === 0) {
+          renderedSlotKeys[level] && renderedSlotKeys[level].delete(slotName)
+          restoreSlotNames.push(slotName)
+        }
+      }
+    })
+    return restoreSlotNames
+  }
+
+  function registerSlot(
+    name: string,
+    slot: Slot,
+    level: number,
+    renderedKeys?: Set<string>,
+  ) {
+    slotsQueue[name] ||= []
+    slotsQueue[name].push([level, slot])
+    slotsQueue[name].sort((a, b) => b[0] - a[0])
+    // hide old slot if the registered slot is the highest level
+    if (slotsQueue[name][1]) {
+      const hidenLevel = slotsQueue[name][1][0]
+      renderedSlotKeys[hidenLevel] && renderedSlotKeys[hidenLevel].delete(name)
+    }
+    if (slotsQueue[name][0][0] === level) {
+      renderedKeys && renderedKeys.add(name)
+    }
+    // render the highest level slot
+    addSlot(name, slotsQueue[name][0][1])
+  }
+
+  function addSlot(name: string, fn: Slot) {
     instance.slots[name] = withCtx(fn)
-    recordNames && recordNames.add(name)
   }
 
   function withCtx(fn: Slot): Slot {
