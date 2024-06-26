@@ -29,7 +29,7 @@ export class BlockEffectScope extends EffectScope {
   }
 }
 
-export function isRenderEffectScope(
+export function isBlockEffectScope(
   scope: EffectScope | undefined,
 ): scope is BlockEffectScope {
   return scope instanceof BlockEffectScope

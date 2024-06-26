@@ -21,7 +21,7 @@ import {
 } from './errorHandling'
 import { queueJob, queuePostFlushCb } from './scheduler'
 import { warn } from './warning'
-import { type BlockEffectScope, isRenderEffectScope } from './blockEffectScope'
+import { type BlockEffectScope, isBlockEffectScope } from './blockEffectScope'
 import { normalizeBlock } from './dom/element'
 
 export type DirectiveModifiers<M extends string = string> = Record<M, boolean>
@@ -112,8 +112,8 @@ export function withDirectives<T extends ComponentInternalInstance | Node>(
   const instance = currentInstance!
   const parentScope = getCurrentScope() as BlockEffectScope
 
-  if (__DEV__ && !isRenderEffectScope(parentScope)) {
-    warn(`Directives should be used inside of RenderEffectScope.`)
+  if (__DEV__ && !isBlockEffectScope(parentScope)) {
+    warn(`Directives should be used inside of BlockEffectScope.`)
   }
 
   const directivesMap = (parentScope.dirs ||= new Map())
@@ -263,4 +263,21 @@ export function createRenderingUpdateTrigger(
       reset()
     }
   }
+}
+
+/** For internal use, set directive binding */
+export function setDirectiveBinding(
+  instance: ComponentInternalInstance | null,
+  anchor: Node | ComponentInternalInstance,
+  dir: Directive,
+  value: any = null,
+  oldValue: any = undefined,
+  parentScope = getCurrentScope() as BlockEffectScope,
+) {
+  if (__DEV__ && !isBlockEffectScope(parentScope)) {
+    warn('directive binding can only be added to BlockEffectScope')
+  }
+
+  const directiveBindingsMap = (parentScope.dirs ||= new Map())
+  directiveBindingsMap.set(anchor, [{ dir, instance, value, oldValue }])
 }

@@ -24,9 +24,6 @@ const injectHook = (
     const wrappedHook =
       hook.__weh ||
       (hook.__weh = (...args: unknown[]) => {
-        if (target.isUnmounted) {
-          return
-        }
         pauseTracking()
         const reset = setCurrentInstance(target)
         const res = target.scope.run(() =>

@@ -136,7 +136,7 @@ describe('api: lifecycle hooks', () => {
   it('onBeforeUnmount', async () => {
     const toggle = ref(true)
     const fn = vi.fn(() => {
-      expect(host.innerHTML).toBe('<div></div>')
+      expect(host.innerHTML).toBe('<div></div><!--if-->')
     })
     const { render, host } = define({
       setup() {
@@ -165,14 +165,14 @@ describe('api: lifecycle hooks', () => {
 
     toggle.value = false
     await nextTick()
-    // expect(fn).toHaveBeenCalledTimes(1) // FIXME: not called
+    expect(fn).toHaveBeenCalledTimes(1)
     expect(host.innerHTML).toBe('<!--if-->')
   })
 
   it('onUnmounted', async () => {
     const toggle = ref(true)
     const fn = vi.fn(() => {
-      expect(host.innerHTML).toBe('<div></div>')
+      expect(host.innerHTML).toBe('<!--if-->')
     })
     const { render, host } = define({
       setup() {
@@ -201,14 +201,14 @@ describe('api: lifecycle hooks', () => {
 
     toggle.value = false
     await nextTick()
-    // expect(fn).toHaveBeenCalledTimes(1) // FIXME: not called
+    expect(fn).toHaveBeenCalledTimes(1)
     expect(host.innerHTML).toBe('<!--if-->')
   })
 
   it('onBeforeUnmount in onMounted', async () => {
     const toggle = ref(true)
     const fn = vi.fn(() => {
-      expect(host.innerHTML).toBe('<div></div>')
+      expect(host.innerHTML).toBe('<div></div><!--if-->')
     })
     const { render, host } = define({
       setup() {
@@ -239,29 +239,32 @@ describe('api: lifecycle hooks', () => {
 
     toggle.value = false
     await nextTick()
-    // expect(fn).toHaveBeenCalledTimes(1) // FIXME: not called
+    expect(fn).toHaveBeenCalledTimes(1)
     expect(host.innerHTML).toBe('<!--if-->')
   })
 
   it('lifecycle call order', async () => {
-    const count = ref(0)
+    const rootCounter = ref(0)
+    const propsCounter = ref(0)
     const toggle = ref(true)
     const calls: string[] = []
 
     const { render } = define({
       setup() {
-        onBeforeMount(() => calls.push('onBeforeMount'))
-        onMounted(() => calls.push('onMounted'))
-        onBeforeUpdate(() => calls.push('onBeforeUpdate'))
-        onUpdated(() => calls.push('onUpdated'))
-        onBeforeUnmount(() => calls.push('onBeforeUnmount'))
-        onUnmounted(() => calls.push('onUnmounted'))
+        onBeforeMount(() => calls.push('root onBeforeMount'))
+        onMounted(() => calls.push('root onMounted'))
+        onBeforeUpdate(() => calls.push('root onBeforeUpdate'))
+        onUpdated(() => calls.push('root onUpdated'))
+        onBeforeUnmount(() => calls.push('root onBeforeUnmount'))
+        onUnmounted(() => calls.push('root onUnmounted'))
         return (() => {
-          const n0 = createIf(
+          const n0 = template('<p></p>')()
+          renderEffect(() => setText(n0, rootCounter.value))
+          const n1 = createIf(
             () => toggle.value,
-            () => createComponent(Mid, { count: () => count.value }),
+            () => createComponent(Mid, { count: () => propsCounter.value }),
           )
-          return n0
+          return [n0, n1]
         })()
       },
     })
@@ -303,42 +306,65 @@ describe('api: lifecycle hooks', () => {
     // mount
     render()
     expect(calls).toEqual([
-      'onBeforeMount',
+      'root onBeforeMount',
       'mid onBeforeMount',
       'child onBeforeMount',
       'child onMounted',
       'mid onMounted',
-      'onMounted',
+      'root onMounted',
     ])
 
     calls.length = 0
 
-    // update
-    count.value++
+    // props update
+    propsCounter.value++
     await nextTick()
-    // FIXME: not called
-    // expect(calls).toEqual([
-    //   'root onBeforeUpdate',
-    //   'mid onBeforeUpdate',
-    //   'child onBeforeUpdate',
-    //   'child onUpdated',
-    //   'mid onUpdated',
-    //   'root onUpdated',
-    // ])
+    // There are no calls in the root and mid,
+    // but maybe such performance would be better.
+    expect(calls).toEqual([
+      // 'root onBeforeUpdate',
+      // 'mid onBeforeUpdate',
+      'child onBeforeUpdate',
+      'child onUpdated',
+      // 'mid onUpdated',
+      // 'root onUpdated',
+    ])
+
+    calls.length = 0
+
+    // root update
+    rootCounter.value++
+    await nextTick()
+    // Root update events should not be passed to children.
+    expect(calls).toEqual(['root onBeforeUpdate', 'root onUpdated'])
 
     calls.length = 0
 
     // unmount
     toggle.value = false
-    // FIXME: not called
-    // expect(calls).toEqual([
-    //   'root onBeforeUnmount',
-    //   'mid onBeforeUnmount',
-    //   'child onBeforeUnmount',
-    //   'child onUnmounted',
-    //   'mid onUnmounted',
-    //   'root onUnmounted',
-    // ])
+    await nextTick()
+    expect(calls).toEqual([
+      'root onBeforeUpdate',
+      'mid onBeforeUnmount',
+      'child onBeforeUnmount',
+      'child onUnmounted',
+      'mid onUnmounted',
+      'root onUpdated',
+    ])
+
+    calls.length = 0
+
+    // mount
+    toggle.value = true
+    await nextTick()
+    expect(calls).toEqual([
+      'root onBeforeUpdate',
+      'mid onBeforeMount',
+      'child onBeforeMount',
+      'child onMounted',
+      'mid onMounted',
+      'root onUpdated',
+    ])
   })
 
   it('onRenderTracked', async () => {
@@ -458,7 +484,7 @@ describe('api: lifecycle hooks', () => {
     expect(fn).toHaveBeenCalledTimes(2)
     toggle.value = false
     await nextTick()
-    // expect(fn).toHaveBeenCalledTimes(4) // FIXME: not called unmounted hook
+    expect(fn).toHaveBeenCalledTimes(4)
   })
 
   // #136

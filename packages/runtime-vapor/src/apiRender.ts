@@ -6,7 +6,7 @@ import {
   validateComponentName,
 } from './component'
 import { insert, querySelector, remove } from './dom/element'
-import { flushPostFlushCbs, queuePostFlushCb } from './scheduler'
+import { flushPostFlushCbs } from './scheduler'
 import { invokeLifecycle } from './componentLifecycle'
 import { VaporLifecycleHooks } from './enums'
 import {
@@ -137,7 +137,7 @@ function mountComponent(
     instance,
     VaporLifecycleHooks.MOUNTED,
     'mounted',
-    instance => (instance.isMounted = true),
+    () => (instance.isMounted = true),
     true,
   )
 
@@ -166,7 +166,7 @@ export function unmountComponent(instance: ComponentInternalInstance) {
     instance,
     VaporLifecycleHooks.UNMOUNTED,
     'unmounted',
-    instance => queuePostFlushCb(() => (instance.isUnmounted = true)),
+    () => (instance.isUnmounted = true),
     true,
   )
   flushPostFlushCbs()

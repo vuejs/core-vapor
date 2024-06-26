@@ -162,7 +162,6 @@ export interface ComponentInternalInstance {
 
   provides: Data
   scope: BlockEffectScope
-  comps: Set<ComponentInternalInstance>
 
   rawProps: NormalizedRawProps
   propsOptions: NormalizedPropsOptions
@@ -286,7 +285,6 @@ export function createComponentInstance(
     scope: null!,
     provides: parent ? parent.provides : Object.create(_appContext.provides),
     type: component,
-    comps: new Set(),
 
     // resolved props and emits options
     rawProps: null!, // set later

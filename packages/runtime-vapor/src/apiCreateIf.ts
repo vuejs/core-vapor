@@ -3,7 +3,7 @@ import { getCurrentScope } from '@vue/reactivity'
 import { createComment, createTextNode, insert, remove } from './dom/element'
 import { currentInstance } from './component'
 import { warn } from './warning'
-import { BlockEffectScope, isRenderEffectScope } from './blockEffectScope'
+import { BlockEffectScope, isBlockEffectScope } from './blockEffectScope'
 import {
   createChildFragmentDirectives,
   invokeWithMount,
@@ -36,7 +36,7 @@ export const createIf = (
   }
 
   const instance = currentInstance!
-  if (__DEV__ && (!instance || !isRenderEffectScope(parentScope))) {
+  if (__DEV__ && (!instance || !isBlockEffectScope(parentScope))) {
     warn('createIf() can only be used inside setup()')
   }
 

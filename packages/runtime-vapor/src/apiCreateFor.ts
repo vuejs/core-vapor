@@ -18,7 +18,7 @@ import { type Block, type Fragment, fragmentKey } from './apiRender'
 import { warn } from './warning'
 import { currentInstance } from './component'
 import { componentKey } from './component'
-import { BlockEffectScope, isRenderEffectScope } from './blockEffectScope'
+import { BlockEffectScope, isBlockEffectScope } from './blockEffectScope'
 import {
   createChildFragmentDirectives,
   invokeWithMount,
@@ -62,7 +62,7 @@ export const createFor = (
   }
 
   const instance = currentInstance!
-  if (__DEV__ && (!instance || !isRenderEffectScope(parentScope))) {
+  if (__DEV__ && (!instance || !isBlockEffectScope(parentScope))) {
     warn('createFor() can only be used inside setup()')
   }
 

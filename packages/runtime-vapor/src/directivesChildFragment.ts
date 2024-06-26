@@ -1,12 +1,12 @@
-import { ReactiveEffect, getCurrentScope } from '@vue/reactivity'
+import { ReactiveEffect } from '@vue/reactivity'
 import {
-  type Directive,
   type DirectiveHookName,
   createRenderingUpdateTrigger,
   invokeDirectiveHook,
+  setDirectiveBinding,
 } from './directives'
 import { warn } from './warning'
-import { type BlockEffectScope, isRenderEffectScope } from './blockEffectScope'
+import { type BlockEffectScope, isBlockEffectScope } from './blockEffectScope'
 import { currentInstance } from './component'
 import { VaporErrorCodes, callWithErrorHandling } from './errorHandling'
 import { queueJob, queuePostFlushCb } from './scheduler'
@@ -25,14 +25,8 @@ export function createChildFragmentDirectives(
 ) {
   let isTriggered = false
   const instance = currentInstance!
-  const parentScope = getCurrentScope() as BlockEffectScope
-  if (__DEV__) {
-    if (!isRenderEffectScope(parentScope)) {
-      warn('child directives can only be added to a render effect scope')
-    }
-    if (!instance) {
-      warn('child directives can only be added in a component')
-    }
+  if (__DEV__ && !instance) {
+    warn('child directives can only be added in a component')
   }
 
   const callSourceWithErrorHandling = () =>
@@ -43,22 +37,13 @@ export function createChildFragmentDirectives(
     return
   }
 
-  const directiveBindingsMap = (parentScope.dirs ||= new Map())
-  const dir: Directive = {
+  setDirectiveBinding(instance, anchor, {
     beforeUpdate: onDirectiveBeforeUpdate,
     beforeMount: () => invokeChildrenDirectives('beforeMount'),
     mounted: () => invokeChildrenDirectives('mounted'),
     beforeUnmount: () => invokeChildrenDirectives('beforeUnmount'),
     unmounted: () => invokeChildrenDirectives('unmounted'),
-  }
-  directiveBindingsMap.set(anchor, [
-    {
-      dir,
-      instance,
-      value: null,
-      oldValue: undefined,
-    },
-  ])
+  })
 
   const effect = new ReactiveEffect(callSourceWithErrorHandling)
   const triggerRenderingUpdate = createRenderingUpdateTrigger(instance, effect)
@@ -93,7 +78,7 @@ export function createChildFragmentDirectives(
 }
 
 export function invokeWithMount(scope: BlockEffectScope, handler?: () => any) {
-  if (isRenderEffectScope(scope.parent) && !scope.parent.im) {
+  if (isBlockEffectScope(scope.parent) && !scope.parent.im) {
     return handler && handler()
   }
   return invokeWithDirsHooks(scope, 'mount', handler)
