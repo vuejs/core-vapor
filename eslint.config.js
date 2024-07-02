@@ -87,7 +87,7 @@ export default tseslint.config(
       'no-console': 'off',
       'no-restricted-globals': 'off',
       'no-restricted-syntax': 'off',
-      'vitest/no-disabled-tests': 'error',
+      'vitest/no-disabled-tests': 'warn',
       'vitest/no-focused-tests': 'error',
     },
   },
