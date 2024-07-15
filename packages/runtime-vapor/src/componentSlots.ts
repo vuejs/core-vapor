@@ -55,6 +55,15 @@ export function initSlots(
   /**
    * Maintain a queue for each slot name, so that we can
    * render the next slot when the highest level slot was removed
+   *
+   * |- key1: [level2, slot2], [level1, slot1]
+   * |
+   * |- key2: [level3, slot3]
+   * |
+   * |...
+   *
+   * For example, if level2 slot re-rendered and it turns out to render key3
+   * then we need to take out level1 slot and render in key1
    */
   const slotsQueue: Record<string, [level: number, slot: Slot][]> = {}
   rawSlots.forEach((slots, index) => {
