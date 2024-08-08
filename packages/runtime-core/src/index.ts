@@ -63,6 +63,14 @@ export { defineComponent } from './apiDefineComponent'
 export { defineAsyncComponent } from './apiAsyncComponent'
 export { useAttrs, useSlots } from './apiSetupHelpers'
 export { useModel } from './helpers/useModel'
+export { useTemplateRef } from './helpers/useTemplateRef'
+export { useId } from './helpers/useId'
+export {
+  hydrateOnIdle,
+  hydrateOnVisible,
+  hydrateOnMediaQuery,
+  hydrateOnInteraction,
+} from './hydrationStrategies'
 
 // <script setup> API ----------------------------------------------------------
 
@@ -327,6 +335,10 @@ export type {
   AsyncComponentOptions,
   AsyncComponentLoader,
 } from './apiAsyncComponent'
+export type {
+  HydrationStrategy,
+  HydrationStrategyFactory,
+} from './hydrationStrategies'
 export type { HMRRuntime } from './hmr'
 
 // Internal API ----------------------------------------------------------------

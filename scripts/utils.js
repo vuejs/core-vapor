@@ -2,17 +2,21 @@
 import fs from 'node:fs'
 import pico from 'picocolors'
 import { createRequire } from 'node:module'
+import { spawn } from 'node:child_process'
+import path from 'node:path'
 
 const require = createRequire(import.meta.url)
+const packagesPath = path.resolve(import.meta.dirname, '../packages')
 
-export const targets = fs.readdirSync('packages').filter(f => {
+export const targets = fs.readdirSync(packagesPath).filter(f => {
+  const folder = path.resolve(packagesPath, f)
   if (
-    !fs.statSync(`packages/${f}`).isDirectory() ||
-    !fs.existsSync(`packages/${f}/package.json`)
+    !fs.statSync(folder).isDirectory() ||
+    !fs.existsSync(`${folder}/package.json`)
   ) {
     return false
   }
-  const pkg = require(`../packages/${f}/package.json`)
+  const pkg = require(`${folder}/package.json`)
   if (pkg.private && !pkg.buildOptions) {
     return false
   }
@@ -54,4 +58,62 @@ export function fuzzyMatchTarget(partialTargets, includeAllMatching) {
 
     process.exit(1)
   }
+}
+
+/**
+ * @param {string} command
+ * @param {ReadonlyArray<string>} args
+ * @param {object} [options]
+ * @returns {Promise<{ ok: boolean, code: number | null, stderr: string, stdout: string }>}
+ */
+export async function exec(command, args, options) {
+  return new Promise((resolve, reject) => {
+    const _process = spawn(command, args, {
+      stdio: [
+        'ignore', // stdin
+        'pipe', // stdout
+        'pipe', // stderr
+      ],
+      ...options,
+      shell: process.platform === 'win32',
+    })
+
+    /**
+     * @type {Buffer[]}
+     */
+    const stderrChunks = []
+    /**
+     * @type {Buffer[]}
+     */
+    const stdoutChunks = []
+
+    _process.stderr?.on('data', chunk => {
+      stderrChunks.push(chunk)
+    })
+
+    _process.stdout?.on('data', chunk => {
+      stdoutChunks.push(chunk)
+    })
+
+    _process.on('error', error => {
+      reject(error)
+    })
+
+    _process.on('exit', code => {
+      const ok = code === 0
+      const stderr = Buffer.concat(stderrChunks).toString().trim()
+      const stdout = Buffer.concat(stdoutChunks).toString().trim()
+      const result = { ok, code, stderr, stdout }
+      resolve(result)
+    })
+  })
+}
+
+/**
+ * @param {boolean=} short
+ */
+export async function getSha(short) {
+  return (
+    await exec('git', ['rev-parse', ...(short ? ['--short'] : []), 'HEAD'])
+  ).stdout
 }
