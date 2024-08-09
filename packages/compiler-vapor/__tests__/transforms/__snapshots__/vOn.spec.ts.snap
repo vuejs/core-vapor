@@ -5,7 +5,7 @@ exports[`v-on > complex member expression w/ prefixIdentifiers: true 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => _ctx.a['b' + _ctx.c])
   return n0
@@ -16,7 +16,7 @@ exports[`v-on > dynamic arg 1`] = `
 "import { renderEffect as _renderEffect, on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _renderEffect(() => {
     _on(n0, _ctx.event, () => _ctx.handler, {
@@ -31,7 +31,7 @@ exports[`v-on > dynamic arg with complex exp prefixing 1`] = `
 "import { renderEffect as _renderEffect, on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _renderEffect(() => {
     _on(n0, _ctx.event(_ctx.foo), () => _ctx.handler, {
@@ -46,7 +46,7 @@ exports[`v-on > dynamic arg with prefixing 1`] = `
 "import { renderEffect as _renderEffect, on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _renderEffect(() => {
     _on(n0, _ctx.event, () => _ctx.handler, {
@@ -65,7 +65,7 @@ const t2 = _template("<div></div>")
 const t3 = _template("<input>")
 _delegateEvents("click", "contextmenu", "mouseup", "keyup")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   const n1 = t1()
   const n2 = t0()
@@ -164,7 +164,7 @@ exports[`v-on > function expression w/ prefixIdentifiers: true 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => e => _ctx.foo(e))
   return n0
@@ -176,7 +176,7 @@ exports[`v-on > inline statement w/ prefixIdentifiers: true 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => $event => (_ctx.foo($event)))
   return n0
@@ -188,7 +188,7 @@ exports[`v-on > multiple inline statements w/ prefixIdentifiers: true 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => $event => {_ctx.foo($event);_ctx.bar()})
   return n0
@@ -200,7 +200,7 @@ exports[`v-on > should NOT add a prefix to $event if the expression is a functio
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => $event => {_ctx.i++;_ctx.foo($event)})
   return n0
@@ -212,7 +212,7 @@ exports[`v-on > should NOT wrap as function if expression is already function ex
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => (e: any): any => _ctx.foo(e))
   return n0
@@ -224,7 +224,7 @@ exports[`v-on > should NOT wrap as function if expression is already function ex
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => 
       $event => {
@@ -240,7 +240,7 @@ exports[`v-on > should NOT wrap as function if expression is already function ex
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => $event => _ctx.foo($event))
   return n0
@@ -252,7 +252,7 @@ exports[`v-on > should NOT wrap as function if expression is complex member expr
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => _ctx.a['b' + _ctx.c])
   return n0
@@ -264,7 +264,7 @@ exports[`v-on > should delegate event 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => _ctx.test)
   return n0
@@ -276,7 +276,7 @@ exports[`v-on > should handle multi-line statement 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => $event => {
 _ctx.foo();
@@ -291,7 +291,7 @@ exports[`v-on > should handle multiple inline statement 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => $event => {_ctx.foo();_ctx.bar()})
   return n0
@@ -303,7 +303,7 @@ exports[`v-on > should not prefix member expression 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => _ctx.foo.bar)
   return n0
@@ -315,7 +315,7 @@ exports[`v-on > should not wrap keys guard if no key modifier is present 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("keyup")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "keyup", () => _ctx.test, {
     modifiers: ["exact"]
@@ -329,7 +329,7 @@ exports[`v-on > should support multiple events and modifiers options w/ prefixId
 const t0 = _template("<div></div>")
 _delegateEvents("click", "keyup")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => _ctx.test, {
     modifiers: ["stop"]
@@ -345,7 +345,7 @@ exports[`v-on > should support multiple modifiers and event options w/ prefixIde
 "import { on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _on(n0, "click", () => _ctx.test, {
     modifiers: ["stop", "prevent"], 
@@ -361,7 +361,7 @@ exports[`v-on > should transform click.middle 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("mouseup")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "mouseup", () => _ctx.test, {
     modifiers: ["middle"]
@@ -374,7 +374,7 @@ exports[`v-on > should transform click.middle 2`] = `
 "import { renderEffect as _renderEffect, on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _renderEffect(() => {
     _on(n0, (_ctx.event) === "click" ? "mouseup" : (_ctx.event), () => _ctx.test, {
@@ -391,7 +391,7 @@ exports[`v-on > should transform click.right 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("contextmenu")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "contextmenu", () => _ctx.test, {
     modifiers: ["right"]
@@ -404,7 +404,7 @@ exports[`v-on > should transform click.right 2`] = `
 "import { renderEffect as _renderEffect, on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _renderEffect(() => {
     _on(n0, (_ctx.event) === "click" ? "contextmenu" : (_ctx.event), () => _ctx.test, {
@@ -422,7 +422,7 @@ exports[`v-on > should wrap as function if expression is inline statement 1`] = 
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => $event => (_ctx.i++))
   return n0
@@ -433,7 +433,7 @@ exports[`v-on > should wrap both for dynamic key event w/ left/right modifiers 1
 "import { renderEffect as _renderEffect, on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _renderEffect(() => {
     _on(n0, _ctx.e, () => _ctx.test, {
@@ -462,7 +462,7 @@ exports[`v-on > should wrap keys guard for keyboard events or dynamic events 1`]
 "import { on as _on, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _on(n0, "keydown", () => _ctx.test, {
     modifiers: ["stop", "ctrl"], 
@@ -478,7 +478,7 @@ exports[`v-on > should wrap keys guard for static key event w/ left/right modifi
 const t0 = _template("<div></div>")
 _delegateEvents("keyup")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "keyup", () => _ctx.test, {
     keys: ["left"]
@@ -492,7 +492,7 @@ exports[`v-on > simple expression 1`] = `
 const t0 = _template("<div></div>")
 _delegateEvents("click")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = t0()
   _delegate(n0, "click", () => _ctx.handleClick)
   return n0

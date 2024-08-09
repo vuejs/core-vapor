@@ -168,7 +168,15 @@ function genIdentifier(
         raw = withAssignment(raw)
     }
   } else {
-    raw = withAssignment(canPrefix(raw) ? `_ctx.${raw}` : raw)
+    const type = bindingMetadata[raw]
+    if (type && type.startsWith('setup')) {
+      raw = `_ctx.${raw}`
+    } else if (type) {
+      raw = `$${type}.${raw}`
+    } else if (canPrefix(raw)) {
+      raw = `_ctx.${raw}`
+    }
+    raw = withAssignment(raw)
   }
   return [prefix, [raw, NewlineType.None, loc, name]]
 

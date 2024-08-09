@@ -4,7 +4,7 @@ exports[`compiler: v-if > basic v-if 1`] = `
 "import { renderEffect as _renderEffect, setText as _setText, createIf as _createIf, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = _createIf(() => (_ctx.ok), () => {
     const n2 = t0()
     _renderEffect(() => _setText(n2, _ctx.msg))
@@ -23,7 +23,7 @@ const t3 = _template("<!--bar-->")
 const t4 = _template("fine")
 const t5 = _template("<input>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n13 = t5()
   const n0 = _createIf(() => (_ctx.ok), () => {
     const n2 = t0()
@@ -46,7 +46,7 @@ exports[`compiler: v-if > dedupe same template 1`] = `
 "import { createIf as _createIf, template as _template } from 'vue/vapor';
 const t0 = _template("<div>hello</div>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = _createIf(() => (_ctx.ok), () => {
     const n2 = t0()
     return n2
@@ -65,7 +65,7 @@ const t0 = _template("<div></div>")
 const t1 = _template("hello")
 const t2 = _template("<p></p>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = _createIf(() => (_ctx.ok), () => {
     const n2 = t0()
     const n3 = t1()
@@ -82,7 +82,7 @@ exports[`compiler: v-if > v-if + v-else 1`] = `
 const t0 = _template("<div></div>")
 const t1 = _template("<p></p>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = _createIf(() => (_ctx.ok), () => {
     const n2 = t0()
     return n2
@@ -100,7 +100,7 @@ const t0 = _template("<div></div>")
 const t1 = _template("<p></p>")
 const t2 = _template("fine")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = _createIf(() => (_ctx.ok), () => {
     const n2 = t0()
     return n2
@@ -120,7 +120,7 @@ exports[`compiler: v-if > v-if + v-else-if 1`] = `
 const t0 = _template("<div></div>")
 const t1 = _template("<p></p>")
 
-export function render(_ctx) {
+export function render(_ctx, $props) {
   const n0 = _createIf(() => (_ctx.ok), () => {
     const n2 = t0()
     return n2
