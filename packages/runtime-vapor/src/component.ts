@@ -111,6 +111,17 @@ export interface ObjectComponent extends ComponentInternalOptions {
   emits?: EmitsOptions
   render?(ctx: any): Block
 
+  /**
+   * marker for AsyncComponentWrapper
+   * @internal
+   */
+  __asyncLoader?: () => Promise<Component>
+  /**
+   * the inner component resolved by the AsyncComponentWrapper
+   * @internal
+   */
+  __asyncResolved?: Component
+
   name?: string
   vapor?: boolean
 }
@@ -175,6 +186,7 @@ export interface ComponentInternalInstance {
   emit: EmitFn
   emitted: Record<string, boolean> | null
   attrs: Data
+  rawSlots: RawSlots
   slots: StaticSlots
   refs: Data
   // exposed properties via expose()
@@ -301,6 +313,7 @@ export function createComponentInstance(
     emitted: null,
     attrs: EMPTY_OBJ,
     slots: EMPTY_OBJ,
+    rawSlots: slots || EMPTY_OBJ,
     refs: EMPTY_OBJ,
 
     // lifecycle
