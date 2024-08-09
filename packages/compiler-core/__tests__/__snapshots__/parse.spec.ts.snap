@@ -2399,6 +2399,7 @@ exports[`compiler: parse > Errors > MISSING_END_TAG_NAME > <template></></templa
     {
       "children": [],
       "codegenNode": undefined,
+      "isShouldSelfClosing": true,
       "loc": {
         "end": {
           "column": 25,
@@ -4549,6 +4550,7 @@ exports[`compiler: parse > Errors > X_MISSING_END_TAG > <template><div></templat
         },
       ],
       "codegenNode": undefined,
+      "isShouldSelfClosing": true,
       "loc": {
         "end": {
           "column": 27,

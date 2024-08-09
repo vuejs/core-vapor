@@ -161,11 +161,21 @@ function transformNativeElement(
       }
     }
   }
+  const { node } = context
 
-  template += `>` + context.childrenTemplate.join('')
+  if (node.isShouldSelfClosing) {
+    template += context.childrenTemplate.join('')
+  } else {
+    template += `>` + context.childrenTemplate.join('')
+  }
+
   // TODO remove unnecessary close tag, e.g. if it's the last element of the template
   if (!isVoidTag(tag)) {
-    template += `</${tag}>`
+    if (node.isShouldSelfClosing) {
+      template += ` />`
+    } else {
+      template += `</${tag}>`
+    }
   }
 
   if (

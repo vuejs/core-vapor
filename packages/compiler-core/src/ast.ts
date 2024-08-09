@@ -70,6 +70,7 @@ export enum ElementTypes {
 export interface Node {
   type: NodeTypes
   loc: SourceLocation
+  isShouldSelfClosing?: boolean
 }
 
 // The node's range. The `start` is inclusive and `end` is exclusive.

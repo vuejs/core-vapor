@@ -476,6 +476,7 @@ describe('compiler: parse', () => {
         type: NodeTypes.ELEMENT,
         ns: Namespaces.HTML,
         tag: 'div',
+        isShouldSelfClosing: true,
         tagType: ElementTypes.ELEMENT,
         codegenNode: undefined,
         props: [],
