@@ -77,8 +77,6 @@ export {
   type Directive,
   type DirectiveBinding,
   type DirectiveHook,
-  type ObjectDirective,
-  type FunctionDirective,
   type DirectiveArguments,
   type DirectiveModifiers,
 } from './directives'
