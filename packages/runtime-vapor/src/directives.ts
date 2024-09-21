@@ -6,14 +6,14 @@ import {
 } from './component'
 import { warn } from './warning'
 import { normalizeBlock } from './dom/element'
-import { getCurrentScope } from '@vue/reactivity'
+import { type ShallowRef, getCurrentScope, shallowRef } from '@vue/reactivity'
 import { VaporErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
 
 export type DirectiveModifiers<M extends string = string> = Record<M, boolean>
 
 export interface DirectiveBinding<T = any, V = any, M extends string = string> {
   instance: ComponentInternalInstance
-  source?: () => V
+  source: () => V
   arg?: string
   modifiers?: DirectiveModifiers<M>
   dir: Directive<T, V, M>
@@ -21,17 +21,10 @@ export interface DirectiveBinding<T = any, V = any, M extends string = string> {
 
 export type DirectiveBindingsMap = Map<Node, DirectiveBinding[]>
 
-export type Directive<
-  T = any,
-  V = any,
-  M extends string = string,
-> = DirectiveHook<T, V, M>
-
-export type DirectiveHook<
-  T = any | null,
-  V = any,
-  M extends string = string,
-> = (node: T, binding: DirectiveBinding<T, V, M>) => void
+export type Directive<T = any, V = any, M extends string = string> = (
+  node: ShallowRef<T>,
+  binding: DirectiveBinding<T, V, M>,
+) => void
 
 export function validateDirectiveName(name: string): void {
   if (isBuiltInDirective(name)) {
@@ -77,7 +70,7 @@ export function withDirectives<T extends ComponentInternalInstance | Node>(
   }
 
   for (const directive of directives) {
-    let [dir, source, arg, modifiers] = directive
+    let [dir, source = () => undefined, arg, modifiers] = directive
     if (!dir) continue
 
     const binding: DirectiveBinding = {
@@ -89,7 +82,7 @@ export function withDirectives<T extends ComponentInternalInstance | Node>(
     }
 
     callWithAsyncErrorHandling(dir, instance, VaporErrorCodes.DIRECTIVE_HOOK, [
-      node,
+      shallowRef(node),
       binding,
     ])
   }

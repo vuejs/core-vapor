@@ -11,18 +11,18 @@ export interface VShowElement extends HTMLElement {
   [vShowHidden]: boolean
 }
 
-export const vShow: Directive<VShowElement> = (node, { source }) => {
+export const vShow: Directive<VShowElement> = ({ value: el }, { source }) => {
   function getValue(): boolean {
     return source ? source() : false
   }
 
   onBeforeMount(() => {
-    node[vShowOriginalDisplay] =
-      node.style.display === 'none' ? '' : node.style.display
+    el[vShowOriginalDisplay] =
+      el.style.display === 'none' ? '' : el.style.display
   })
 
   renderEffect(() => {
-    setDisplay(node, getValue())
+    setDisplay(el, getValue())
   })
 }
 
