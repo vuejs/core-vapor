@@ -76,7 +76,6 @@ export {
   withDirectives,
   type Directive,
   type DirectiveBinding,
-  type DirectiveHook,
   type DirectiveArguments,
   type DirectiveModifiers,
 } from './directives'
