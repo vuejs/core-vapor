@@ -47,7 +47,7 @@ export const vModelText: Directive<
   HTMLInputElement | HTMLTextAreaElement,
   any,
   'lazy' | 'trim' | 'number'
-> = ({ value: el }, { source, modifiers: { lazy, trim, number } = {} }) => {
+> = (el, { source, modifiers: { lazy, trim, number } = {} }) => {
   onBeforeMount(() => {
     const assigner = getModelAssigner(el)
     assignFnMap.set(el, assigner)
@@ -116,10 +116,7 @@ export const vModelText: Directive<
   })
 }
 
-export const vModelRadio: Directive<HTMLInputElement> = (
-  { value: el },
-  { source },
-) => {
+export const vModelRadio: Directive<HTMLInputElement> = (el, { source }) => {
   onBeforeMount(() => {
     el.checked = looseEqual(source(), getValue(el))
     assignFnMap.set(el, getModelAssigner(el))
@@ -136,7 +133,7 @@ export const vModelRadio: Directive<HTMLInputElement> = (
 }
 
 export const vModelSelect: Directive<HTMLSelectElement, any, 'number'> = (
-  { value: el },
+  el,
   { source, modifiers: { number = false } = {} },
 ) => {
   onBeforeMount(() => {
@@ -235,10 +232,7 @@ function getCheckboxValue(el: HTMLInputElement, checked: boolean) {
   return checked
 }
 
-export const vModelCheckbox: Directive<HTMLInputElement> = (
-  { value: el },
-  { source },
-) => {
+export const vModelCheckbox: Directive<HTMLInputElement> = (el, { source }) => {
   onBeforeMount(() => {
     assignFnMap.set(el, getModelAssigner(el))
 
@@ -294,10 +288,10 @@ export const vModelCheckbox: Directive<HTMLInputElement> = (
 
 export const vModelDynamic: Directive<
   HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-> = (elRef, binding) => {
-  const type = elRef.value.getAttribute('type')
-  const modelToUse = resolveDynamicModel(elRef.value.tagName, type)
-  modelToUse(elRef, binding)
+> = (el, binding) => {
+  const type = el.getAttribute('type')
+  const modelToUse = resolveDynamicModel(el.tagName, type)
+  modelToUse(el, binding)
 }
 
 function resolveDynamicModel(tagName: string, type: string | null): Directive {

@@ -6,7 +6,7 @@ import {
 } from './component'
 import { warn } from './warning'
 import { normalizeBlock } from './dom/element'
-import { type ShallowRef, getCurrentScope, shallowRef } from '@vue/reactivity'
+import { getCurrentScope } from '@vue/reactivity'
 import { VaporErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
 
 export type DirectiveModifiers<M extends string = string> = Record<M, boolean>
@@ -22,7 +22,7 @@ export interface DirectiveBinding<T = any, V = any, M extends string = string> {
 export type DirectiveBindingsMap = Map<Node, DirectiveBinding[]>
 
 export type Directive<T = any, V = any, M extends string = string> = (
-  node: ShallowRef<T>,
+  node: T,
   binding: DirectiveBinding<T, V, M>,
 ) => void
 
@@ -82,7 +82,7 @@ export function withDirectives<T extends ComponentInternalInstance | Node>(
     }
 
     callWithAsyncErrorHandling(dir, instance, VaporErrorCodes.DIRECTIVE_HOOK, [
-      shallowRef(node),
+      node,
       binding,
     ])
   }
