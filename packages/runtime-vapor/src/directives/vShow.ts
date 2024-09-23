@@ -1,4 +1,3 @@
-import { onBeforeMount } from '../apiLifecycle'
 import type { Directive } from '../directives'
 import { renderEffect } from '../renderEffect'
 
@@ -12,18 +11,8 @@ export interface VShowElement extends HTMLElement {
 }
 
 export const vShow: Directive<VShowElement> = ({ value: el }, { source }) => {
-  function getValue(): boolean {
-    return source ? source() : false
-  }
-
-  onBeforeMount(() => {
-    el[vShowOriginalDisplay] =
-      el.style.display === 'none' ? '' : el.style.display
-  })
-
-  renderEffect(() => {
-    setDisplay(el, getValue())
-  })
+  el[vShowOriginalDisplay] = el.style.display === 'none' ? '' : el.style.display
+  renderEffect(() => setDisplay(el, source()))
 }
 
 function setDisplay(el: VShowElement, value: unknown): void {
