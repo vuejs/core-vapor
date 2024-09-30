@@ -4,6 +4,7 @@ export const version: string = __VERSION__
 export {
   // core
   type Ref,
+  type ShallowRef,
   type DebuggerEvent,
   TrackOpTypes,
   TriggerOpTypes,
@@ -52,7 +53,7 @@ export { nextTick } from './scheduler'
 export {
   getCurrentInstance,
   type ComponentInternalInstance,
-  type Component,
+  type Component as Component,
   type ObjectComponent,
   type FunctionalComponent,
   type SetupFn,
@@ -131,6 +132,7 @@ export {
 export { createIf } from './apiCreateIf'
 export { createFor, createForSlots } from './apiCreateFor'
 export { createComponent } from './apiCreateComponent'
+export { createSelector } from './apiCreateSelector'
 
 export { resolveComponent, resolveDirective } from './helpers/resolveAssets'
 export { toHandlers } from './helpers/toHandlers'

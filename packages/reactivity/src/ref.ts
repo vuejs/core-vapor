@@ -182,15 +182,18 @@ class RefImpl<T = any> {
  * @see {@link https://vuejs.org/api/reactivity-advanced.html#triggerref}
  */
 export function triggerRef(ref: Ref): void {
-  if (__DEV__) {
-    ;(ref as unknown as RefImpl).dep.trigger({
-      target: ref,
-      type: TriggerOpTypes.SET,
-      key: 'value',
-      newValue: (ref as unknown as RefImpl)._value,
-    })
-  } else {
-    ;(ref as unknown as RefImpl).dep.trigger()
+  // ref may be an instance of ObjectRefImpl
+  if ((ref as unknown as RefImpl).dep) {
+    if (__DEV__) {
+      ;(ref as unknown as RefImpl).dep.trigger({
+        target: ref,
+        type: TriggerOpTypes.SET,
+        key: 'value',
+        newValue: (ref as unknown as RefImpl)._value,
+      })
+    } else {
+      ;(ref as unknown as RefImpl).dep.trigger()
+    }
   }
 }
 
@@ -243,7 +246,10 @@ export function toValue<T>(source: MaybeRefOrGetter<T>): T {
 }
 
 const shallowUnwrapHandlers: ProxyHandler<any> = {
-  get: (target, key, receiver) => unref(Reflect.get(target, key, receiver)),
+  get: (target, key, receiver) =>
+    key === ReactiveFlags.RAW
+      ? target
+      : unref(Reflect.get(target, key, receiver)),
   set: (target, key, value, receiver) => {
     const oldValue = target[key]
     if (isRef(oldValue) && !isRef(value)) {

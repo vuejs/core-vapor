@@ -54,7 +54,7 @@ const {
     count: {
       type: 'string',
       short: 'c',
-      default: '50',
+      default: '30',
     },
     noHeadless: {
       type: 'boolean',
@@ -88,15 +88,17 @@ if (!skipBench) {
 async function buildLib() {
   console.info(colors.blue('Building lib...'))
 
+  /** @type {import('node:child_process').SpawnOptions} */
   const options = {
     cwd: path.resolve(import.meta.dirname, '..'),
     stdio: 'inherit',
+    env: { ...process.env, BENCHMARK: 'true' },
   }
-  const BuildOptions = devBuild ? '-df' : '-pf'
+  const buildOptions = devBuild ? '-df' : '-pf'
   const [{ ok }, { ok: ok2 }, { ok: ok3 }, { ok: ok4 }] = await Promise.all([
     exec(
       'pnpm',
-      `run --silent build shared compiler-core compiler-dom compiler-vapor ${BuildOptions} cjs`.split(
+      `run --silent build shared compiler-core compiler-dom compiler-vapor ${buildOptions} cjs`.split(
         ' ',
       ),
       options,
@@ -108,12 +110,12 @@ async function buildLib() {
     ),
     exec(
       'pnpm',
-      `run --silent build vue-vapor ${BuildOptions} esm-browser`.split(' '),
+      `run --silent build vue-vapor ${buildOptions} esm-browser`.split(' '),
       options,
     ),
     exec(
       'pnpm',
-      `run --silent build vue ${BuildOptions} esm-browser-runtime`.split(' '),
+      `run --silent build vue ${buildOptions} esm-browser-runtime`.split(' '),
       options,
     ),
   ])
@@ -130,7 +132,7 @@ async function buildApp(isVapor) {
     colors.blue(`\nBuilding ${isVapor ? 'Vapor' : 'Virtual DOM'} app...\n`),
   )
 
-  process.env.NODE_ENV = 'production'
+  if (!devBuild) process.env.NODE_ENV = 'production'
   const CompilerSFC = await import(
     '../packages/compiler-sfc/dist/compiler-sfc.cjs.js'
   )
@@ -216,6 +218,7 @@ async function doBench(browser, isVapor) {
   console.info('\n\nmode:', mode)
 
   const page = await browser.newPage()
+  page.emulateCPUThrottling(4)
   await page.goto(`http://localhost:${port}/${mode}`, {
     waitUntil: 'networkidle0',
   })

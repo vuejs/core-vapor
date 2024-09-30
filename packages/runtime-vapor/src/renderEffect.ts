@@ -1,19 +1,18 @@
-import {
-  EffectFlags,
-  ReactiveEffect,
-  type SchedulerJob,
-  SchedulerJobFlags,
-  getCurrentScope,
-} from '@vue/reactivity'
+import { EffectFlags, ReactiveEffect, getCurrentScope } from '@vue/reactivity'
 import { invokeArrayFns } from '@vue/shared'
 import {
   type ComponentInternalInstance,
   getCurrentInstance,
   setCurrentInstance,
 } from './component'
-import { queueJob, queuePostFlushCb } from './scheduler'
+import {
+  type SchedulerJob,
+  VaporSchedulerJobFlags,
+  queueJob,
+  queuePostFlushCb,
+} from './scheduler'
 import { VaporErrorCodes, callWithAsyncErrorHandling } from './errorHandling'
-import { invokeDirectiveHook } from './directives'
+import { memoStack } from './memo'
 
 export function renderEffect(cb: () => void): void {
   const instance = getCurrentInstance()
@@ -32,6 +31,13 @@ export function renderEffect(cb: () => void): void {
       reset()
     }
     job.id = instance.uid
+  }
+
+  let memos: (() => any[])[] | undefined
+  let memoCaches: any[][]
+  if (memoStack.length) {
+    memos = Array.from(memoStack)
+    memoCaches = memos.map(memo => memo())
   }
 
   const effect = new ReactiveEffect(() =>
@@ -54,19 +60,37 @@ export function renderEffect(cb: () => void): void {
       return
     }
 
+    if (memos) {
+      let dirty: boolean | undefined
+      for (let i = 0; i < memos.length; i++) {
+        const memo = memos[i]
+        const cache = memoCaches[i]
+        const value = memo()
+
+        for (let j = 0; j < Math.max(value.length, cache.length); j++) {
+          if (value[j] !== cache[j]) {
+            dirty = true
+            break
+          }
+        }
+
+        memoCaches[i] = value
+      }
+
+      if (!dirty) {
+        return
+      }
+    }
+
     const reset = instance && setCurrentInstance(instance)
 
     if (instance && instance.isMounted && !instance.isUpdating) {
       instance.isUpdating = true
 
-      const { bu, u, scope } = instance
-      const { dirs } = scope
+      const { bu, u } = instance
       // beforeUpdate hook
       if (bu) {
         invokeArrayFns(bu)
-      }
-      if (dirs) {
-        invokeDirectiveHook(instance, 'beforeUpdate', scope)
       }
 
       effect.run()
@@ -74,9 +98,6 @@ export function renderEffect(cb: () => void): void {
       queuePostFlushCb(() => {
         instance.isUpdating = false
         const reset = setCurrentInstance(instance)
-        if (dirs) {
-          invokeDirectiveHook(instance, 'updated', scope)
-        }
         // updated hook
         if (u) {
           queuePostFlushCb(u)
@@ -97,7 +118,7 @@ export function firstEffect(
 ): void {
   const effect = new ReactiveEffect(fn)
   const job: SchedulerJob = () => effect.run()
-  job.flags! |= SchedulerJobFlags.PRE
+  job.flags! |= VaporSchedulerJobFlags.PRE
   job.id = instance.uid
   effect.scheduler = () => queueJob(job)
   effect.run()

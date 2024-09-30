@@ -1,24 +1,27 @@
 <script setup lang="ts" vapor>
-import { ref, shallowRef } from '@vue/vapor'
+import {
+  shallowRef,
+  triggerRef,
+  type ShallowRef,
+  createSelector,
+} from '@vue/vapor'
 import { buildData } from './data'
 import { defer, wrap } from './profiling'
 
 const isVapor = !!import.meta.env.IS_VAPOR
 
-const selected = ref<number>()
+const selected = shallowRef<number>()
 const rows = shallowRef<
   {
     id: number
-    label: string
+    label: ShallowRef<string>
   }[]
 >([])
 
-function setRows(update = rows.value.slice()) {
-  rows.value = update
-}
-
+// Bench Add: https://jsbench.me/45lzxprzmu/1
 const add = wrap('add', () => {
-  rows.value = rows.value.concat(buildData(1000))
+  rows.value.push(...buildData(1000))
+  triggerRef(rows)
 })
 
 const remove = wrap('remove', (id: number) => {
@@ -26,7 +29,7 @@ const remove = wrap('remove', (id: number) => {
     rows.value.findIndex(d => d.id === id),
     1,
   )
-  setRows()
+  triggerRef(rows)
 })
 
 const select = wrap('select', (id: number) => {
@@ -34,25 +37,24 @@ const select = wrap('select', (id: number) => {
 })
 
 const run = wrap('run', () => {
-  setRows(buildData())
+  rows.value = buildData()
   selected.value = undefined
 })
 
 const update = wrap('update', () => {
   const _rows = rows.value
-  for (let i = 0; i < _rows.length; i += 10) {
-    _rows[i].label += ' !!!'
+  for (let i = 0, len = _rows.length; i < len; i += 10) {
+    _rows[i].label.value += ' !!!'
   }
-  setRows()
 })
 
 const runLots = wrap('runLots', () => {
-  setRows(buildData(10000))
+  rows.value = buildData(10000)
   selected.value = undefined
 })
 
 const clear = wrap('clear', () => {
-  setRows([])
+  rows.value = []
   selected.value = undefined
 })
 
@@ -63,7 +65,7 @@ const swapRows = wrap('swap', () => {
     const d998 = _rows[998]
     _rows[1] = d998
     _rows[998] = d1
-    setRows()
+    triggerRef(rows)
   }
 })
 
@@ -74,10 +76,34 @@ async function bench() {
     await runLots()
   }
 }
+
+const isSelected = createSelector(selected)
+
+const globalThis = window
 </script>
 
 <template>
   <h1>Vue.js ({{ isVapor ? 'Vapor' : 'Virtual DOM' }}) Benchmark</h1>
+
+  <div style="display: flex; gap: 4px; margin-bottom: 4px">
+    <label>
+      <input
+        type="checkbox"
+        :value="globalThis.doProfile"
+        @change="globalThis.doProfile = $event.target.checked"
+      />
+      Profiling
+    </label>
+    <label>
+      <input
+        type="checkbox"
+        :value="globalThis.reactivity"
+        @change="globalThis.reactivity = $event.target.checked"
+      />
+      Reactivity Cost
+    </label>
+  </div>
+
   <div
     id="control"
     style="display: flex; flex-direction: column; width: fit-content; gap: 6px"
@@ -96,11 +122,11 @@ async function bench() {
       <tr
         v-for="row of rows"
         :key="row.id"
-        :class="{ danger: row.id === selected }"
+        :class="{ danger: isSelected(row.id) }"
       >
         <td>{{ row.id }}</td>
         <td>
-          <a @click="select(row.id)">{{ row.label }}</a>
+          <a @click="select(row.id)">{{ row.label.value }}</a>
         </td>
         <td>
           <button @click="remove(row.id)">x</button>
