@@ -59,6 +59,15 @@ describe('compile', () => {
     expect(code).matchSnapshot()
   })
 
+  test('props bindings', () => {
+    const code = compile(`<div :count="count">count</div>`, {
+      bindingMetadata: {
+        count: BindingTypes.PROPS,
+      },
+    })
+    expect(code).matchSnapshot()
+  })
+
   describe('directives', () => {
     describe('v-pre', () => {
       test('basic', () => {
