@@ -31,11 +31,14 @@ export function setRef(
   if (!currentInstance) return
   const { setupState, isUnmounted } = currentInstance
 
+  const isComponent = isVaporComponent(el)
+  // const isAsync = isComponent && isAsyncWrapper(currentInstance)
+
   if (isUnmounted) {
     return
   }
 
-  const refValue = isVaporComponent(el) ? el.exposed || el : el
+  const refValue = isComponent ? el.exposed || el : el
 
   const refs =
     currentInstance.refs === EMPTY_OBJ

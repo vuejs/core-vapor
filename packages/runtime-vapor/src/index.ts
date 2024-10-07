@@ -99,6 +99,7 @@ export { on, delegate, delegateEvents, setDynamicEvents } from './dom/event'
 export { setRef } from './dom/templateRef'
 
 export { defineComponent } from './apiDefineComponent'
+export { defineAsyncComponent } from './apiAsyncComponent'
 export {
   type InjectionKey,
   inject,
